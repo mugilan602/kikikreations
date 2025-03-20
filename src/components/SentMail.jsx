@@ -1,5 +1,6 @@
 import React from "react";
 import { Eye, RefreshCw, Paperclip } from "lucide-react";
+import { RiShareForwardFill } from "react-icons/ri";
 
 export default function SentMails() {
     const mails = [
@@ -22,7 +23,7 @@ export default function SentMails() {
             <table className="w-full border-collapse">
                 {/* Table Head */}
                 <thead>
-                    <tr className="text-left text-gray-600 text-sm border-b">
+                    <tr className="text-left text-gray-600 text-sm border-b border-t border-gray-400">
                         <th className="py-2 px-4">Type</th>
                         <th className="py-2 px-4">Recipient</th>
                         <th className="py-2 px-4">Subject</th>
@@ -34,7 +35,7 @@ export default function SentMails() {
                 {/* Table Body */}
                 <tbody>
                     {mails.map((mail, index) => (
-                        <tr key={index} className="text-sm text-gray-700 border-b">
+                        <tr key={index} className="text-sm text-gray-700 border-b border-gray-400">
                             <td className="py-3 px-4">{mail.type}</td>
                             <td className="py-3 px-4">{mail.recipient}</td>
                             <td className="py-3 px-4">{mail.subject}</td>
@@ -54,7 +55,7 @@ export default function SentMails() {
                                         <Eye size={18} />
                                     </button>
                                     <button className="text-gray-500 hover:text-gray-700">
-                                        <RefreshCw size={18} />
+                                        <RiShareForwardFill size={18} />
                                     </button>
                                 </div>
                             </td>

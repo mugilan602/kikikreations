@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { FileText, Package, Truck } from "lucide-react";
+import { TestTubeDiagonal, Factory, Truck } from "lucide-react";
 import OrderDetails from "./OrderDetails";
 import Sampling from "./Sampling";
 import Production from "./Production";
@@ -11,9 +11,9 @@ export default function OrderProgress() {
     const [activeTab, setActiveTab] = useState("order-details");
 
     const steps = [
-        { id: "sampling", label: "Sampling", icon: <FileText size={18} /> },
-        { id: "production", label: "Production", icon: <Package size={18} /> },
-        { id: "shipment", label: "Shipment", icon: <Truck size={18} /> },
+        { id: "sampling", label: "Sampling", icon: <TestTubeDiagonal color="#999999" /> },
+        { id: "production", label: "Production", icon: <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#999999"><path d="M80-80v-481l280-119v80l200-80v120h320v480H80Zm360-160h80v-160h-80v160Zm-160 0h80v-160h-80v160Zm320 0h80v-160h-80v160Zm272-380H687l34-260h119l32 260Z" /></svg> },
+        { id: "shipment", label: "Shipment", icon: <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#999999"><path d="m20-427 20-80h220l-20 80H20Zm260 267q-50 0-85-35t-35-85H60l20-87h207l36-146h84l50-200H180l6-24q6-28 27.5-45.5T264-800h456l-37 160h117l120 160-40 200h-80q0 50-35 85t-85 35q-50 0-85-35t-35-85H400q0 50-35 85t-85 35ZM100-573l20-80h260l-20 80H100Zm180 333q17 0 28.5-11.5T320-280q0-17-11.5-28.5T280-320q-17 0-28.5 11.5T240-280q0 17 11.5 28.5T280-240Zm400 0q17 0 28.5-11.5T720-280q0-17-11.5-28.5T680-320q-17 0-28.5 11.5T640-280q0 17 11.5 28.5T680-240Zm-43-200h193l4-21-74-99h-95l-28 120Z" /></svg> },
     ];
 
     const stepProgress = {
@@ -41,7 +41,7 @@ export default function OrderProgress() {
                             {step.icon}
                         </div>
                         <span
-                            className={`text-sm mt-2 "text-gray-500"}`}
+                            className={`text-sm mt-2 text-[#6B7280]`}
                         >
                             {step.label}
                         </span>
@@ -56,14 +56,14 @@ export default function OrderProgress() {
                 className="w-full"
             >
                 {/* Tab Navigation */}
-                <Tabs.List className="flex border-b">
+                <Tabs.List className="flex border-b border-[#E5E7EB]">
                     {["Order Details", "Sampling", "Production", "Shipment", "Sent Mails"].map(
                         (tab) => (
                             <Tabs.Trigger
                                 key={tab}
                                 value={tab.toLowerCase().replace(" ", "-")}
                                 className={`px-4 py-2 text-sm font-medium ${activeTab === tab.toLowerCase().replace(" ", "-")
-                                    ? "border-b-2 border-black text-black"
+                                    ? "border-b-2 border-blue-600 text-blue-600"
                                     : "text-gray-500"
                                     }`}
                             >

@@ -1,16 +1,16 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/navbar";
-import OrderPage from "./components/OrderPage";
-import CourierPage from "./components/CourierPage";
-import OrderProcess from "./components/OrderProgess";
+import OrderPage from "./pages/OrderPage";
+import AddNewOrder from "./components/AddNewOrder";
+import Expenses from "./components/Expenses";
 function App() {
   return (
     <Router>
       <Navbar />
       <Routes>
-        <Route path="/orders" element={<OrderPage />} />
-        <Route path="/courier-page" element={<CourierPage />} />
-        <Route path="/stepper" element={<OrderProcess />} />
+        <Route path="/" element={<OrderPage />} />
+        <Route path="/add" element={<AddNewOrder />} />
+        <Route path="/expenses" element={<Expenses />} />
 
       </Routes>
     </Router>
