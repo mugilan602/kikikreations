@@ -1,29 +1,99 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaFilePdf, FaFileImage } from "react-icons/fa6";
+import { FaTimes } from "react-icons/fa";
+import {deleteFilesFromStorage,updateOrder} from "../firebase/order"
+import useOrderStore from "../store/orderStore";
 
 export default function OrderDetails() {
-    const initialDetails = {
-        customerEmail: "client@example.com",
-        referenceNumber: "#ORD-2024-001",
-        orderName: "Custom Woven Labels",
-        labelType: "Woven",
-        orderDetails: "Custom woven labels with company logo, size specifications: 2x3 inches, material: high-quality polyester, color: navy blue with white text."
+    const orderDetails = useOrderStore((state) => state.orderDetails); 
+    const [removedFiles, setRemovedFiles] = useState([]);
+    const [details, setDetails] = useState({
+        customerEmail: "",
+        referenceNumber: "",
+        orderName: "",
+        labelType: "",
+        orderDetails: "",
+        files: [],
+    });
+
+    const [isChangesDisabled, setIsChangesDisabled] = useState(true);
+    const handleRemoveFile = (index) => {
+        console.log("Removing file at index:", index);
+
+        const fileToRemove = details.files[index];
+        console.log("Files to remove: ", fileToRemove);
+
+        // Update removedFiles state using a functional update
+        setRemovedFiles((prev) => {
+            const updatedRemovedFiles = [...prev, fileToRemove.url];
+            console.log("Updated REMOVED FILES:", updatedRemovedFiles); 
+            return updatedRemovedFiles;
+        });
+
+        // Immediately update UI by removing the file from state
+        setDetails((prevDetails) => ({
+            ...prevDetails,
+            files: prevDetails.files.filter((_, i) => i !== index),
+        }));
+
+        setIsChangesDisabled(false);
     };
 
-    const [details, setDetails] = useState(initialDetails);
-    const [isDraftDisabled, setIsDraftDisabled] = useState(true);
+    // Sync state with store data
+    useEffect(() => {
+        if (orderDetails) {
+            setDetails({
+                customerEmail: orderDetails.customerEmail || "",
+                referenceNumber: orderDetails.referenceNumber || "",
+                orderName: orderDetails.orderName || "",
+                labelType: orderDetails.labelType || "",
+                orderDetails: orderDetails.orderDetails || "",
+                files: orderDetails.files || [],
+            });
+        }
+    }, [orderDetails]);
 
     const handleChange = (e) => {
         setDetails({
             ...details,
-            [e.target.name]: e.target.value
+            [e.target.name]: e.target.value,
         });
-        setIsDraftDisabled(false);
+        setIsChangesDisabled(false);
     };
 
-    const handleSaveDraft = () => {
-        setIsDraftDisabled(true);
+    const handleSaveChanges = async () => {
+        console.log(details,orderDetails);
+        try {
+            if (removedFiles.length > 0) {
+                console.log("Deleting selected files from Firebase Storage...");
+                await deleteFilesFromStorage(removedFiles);
+            }
+
+            console.log("Updating Firestore with new file list...",orderDetails.id);
+            await updateOrder(orderDetails.id, details);
+
+            console.log("Firestore update successful.");
+            useOrderStore.setState({ orderDetails: {id: orderDetails.id,...details}})
+            setRemovedFiles([]);
+        } catch (error) {
+            console.error("Error during save:", error);
+        } finally {
+            setIsChangesDisabled(true);
+        }
     };
+    const truncateFileName = (name, maxLength = 20) => {
+        if (name.length > maxLength) {
+            const extIndex = name.lastIndexOf(".");
+            const extension = extIndex !== -1 ? name.slice(extIndex) : "";
+            const baseName = extIndex !== -1 ? name.slice(0, extIndex) : name;
+            return baseName.slice(0, 10) + "..." + baseName.slice(-5) + extension;
+        }
+        return name;
+    };
+    const getFileInfo = (fileName) => ({
+        icon: fileName.endsWith(".pdf") ? <FaFilePdf size={18} className="text-red-600" /> : <FaFileImage size={18} className="text-blue-600" />,
+        bg: fileName.endsWith(".pdf") ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700",
+    });
 
     return (
         <div className="bg-white py-8 rounded-lg">
@@ -90,14 +160,26 @@ export default function OrderDetails() {
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                    <span className="flex items-center gap-2 px-3 py-1 text-sm font-medium bg-red-100 text-red-700 rounded-md shadow-sm">
-                        <FaFilePdf className="text-red-600" size={18} />
-                        design_specs.pdf
-                    </span>
-                    <span className="flex items-center gap-2 px-3 py-1 text-sm font-medium bg-blue-100 text-blue-700 rounded-md shadow-sm">
-                        <FaFileImage className="text-blue-600" size={18} />
-                        logo.png
-                    </span>
+                    {details.files.map((file, index) => {
+                        const { icon, bg } = getFileInfo(file.name);
+
+                        return (
+                            <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
+                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                    {icon}
+                                    <span className="truncate">{truncateFileName(file.name)}</span>
+                                </a>
+
+                                {/* Close Button */}
+                                <button
+                                    onClick={() => handleRemoveFile(index)}
+                                    className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-1 text-xs hover:bg-red-600"
+                                >
+                                    <FaTimes />
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -108,15 +190,11 @@ export default function OrderDetails() {
                 </button>
 
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"
                         }`}
-                    onClick={handleSaveDraft}
-                    disabled={isDraftDisabled}
+                    onClick={handleSaveChanges}
+                    disabled={isChangesDisabled}
                 >
-                    Save Draft
-                </button>
-
-                <button className="px-4 py-2 bg-blue-600 font-medium text-white rounded-md">
                     Save Changes
                 </button>
             </div>

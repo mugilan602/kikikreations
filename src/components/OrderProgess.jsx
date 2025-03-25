@@ -6,9 +6,12 @@ import Sampling from "./Sampling";
 import Production from "./Production";
 import Shipment from "./Shipment";
 import SentMails from "./SentMail";
-
-export default function OrderProgress() {
+import useOrderStore from "../store/orderStore"
+export default function OrderProgress() {   
     const [activeTab, setActiveTab] = useState("order-details");
+    // console.log("PROPS: ", orderDetails);
+    const orderDetails = useOrderStore((state) => state.orderDetails);
+    // console.log("ORDER DETAILS FROM ORDER PROGRESS: ", orderDetails);
 
     const steps = [
         { id: "sampling", label: "Sampling", icon: <TestTubeDiagonal color="#999999" /> },

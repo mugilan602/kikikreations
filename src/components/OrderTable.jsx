@@ -1,110 +1,64 @@
 import React, { useState } from "react";
 import { Search, Trash2 } from "lucide-react";
+import { useEffect } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { FaChevronRight } from "react-icons/fa6";
-
+import { getOrders, getOrderWithDetails } from "../firebase/order.js"
 import { motion } from "framer-motion";
 import OrderProgress from "../components/OrderProgess";
-
+import useOrderStore from "../store/orderStore.js"
 export default function OrderTable() {
+    const statusStyles = {
+        production: "bg-yellow-100 text-yellow-800",
+        shipment: "bg-green-100 text-green-800",
+        sampling: "bg-blue-100 text-blue-800"
+    };
+    const { orderDetails, setOrderDetails } = useOrderStore(); // Zustand state
+
     const [searchQuery, setSearchQuery] = useState("");
-    const [openItem, setOpenItem] = useState(null); // Track open item for Framer Motion
+    const [openItem, setOpenItem] = useState(null);
+    // const [orderDetails, setOrderDetails] = useState(null);
+    const [orders, setOrders] = useState([]);
 
-    const orders = [
-        {
-            id: "ORD-2024-001",
-            name: "Custom Woven Labels",
-            email: "client@example.com",
-            status: "Production",
-            statusColor: "bg-yellow-100 text-yellow-800",
-            details: {
-                quantity: 1000,
-                deliveryDate: "2024-03-20",
-                notes: "Urgent order - client needs expedited shipping"
-            }
-        },
-        {
-            id: "ORD-2024-002",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
-            }
-        },
+    useEffect(() => {
+        const fetchOrders = async () => {
+            try {
+                const data = await getOrders();
+                setOrders(data);
+                console.log("Fetched Orders: ", data);
+            } catch (error) {
+                console.log("Error fetching orders: ", error);
 
-        {
-            id: "ORD-2024-003",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
             }
-        },
+        };
+        fetchOrders();
+    }, []);
+    const handleOrderOpen = async (orderId) => {
+        setOpenItem(orderId); // Track which order is open
+        console.log("Order ID : ", orderId);
 
-        {
-            id: "ORD-2024-004",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
-            }
-        },
+        if (orderId) {
+            try {
+                // Clear previous order details when a new order is opened
+                setOrderDetails(null);
 
-        {
-            id: "ORD-2024-005",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
-            }
-        },
+                // Fetch new order details
+                const details = await getOrderWithDetails(orderId);
+                console.log(details);
 
-        {
-            id: "ORD-2024-006",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
-            }
-        },
+                setOrderDetails(details); // Store only the latest order details
 
-        {
-            id: "ORD-2024-007",
-            name: "Printed Care Labels",
-            email: "customer@example.com",
-            status: "Shipment",
-            statusColor: "bg-green-100 text-green-800",
-            details: {
-                quantity: 500,
-                deliveryDate: "2024-03-15",
-                notes: "Standard shipping"
+                console.log("Fetched Order Details:", orderDetails);
+            } catch (error) {
+                console.error("Error fetching order details:", error);
             }
-        },
-    ];
+        }
+    };
+
 
     const filteredOrders = orders.filter(order =>
-        order.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.orderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         order.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -136,7 +90,7 @@ export default function OrderTable() {
                     className="w-full min-w-[1000px]"
                     type="single"
                     collapsible
-                    onValueChange={(value) => setOpenItem(value)} // Track open item
+                    onValueChange={(orderId) => { handleOrderOpen(orderId) }} // Track open item
                 >
                     {/* Table Head */}
                     <div className="text-[#6B7280] bg-[#F9FAFB] text-sm border-b border-[#E5E7EB] flex font-medium">
@@ -149,7 +103,7 @@ export default function OrderTable() {
                     </div>
 
                     {/* Table Body */}
-                    {filteredOrders.map((order,index) => (
+                    {filteredOrders.map((order, index) => (
                         <Accordion.Item key={order.id} value={order.id} className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}>
                             <Accordion.Header>
                                 <Accordion.Trigger asChild>
@@ -167,17 +121,17 @@ export default function OrderTable() {
                                         </div>
                                         {/* Order Data */}
                                         <div className="py-4 px-4 flex-[2] text-black font-medium whitespace-nowrap">
-                                            #{order.id}
+                                            {order.referenceNumber}
                                         </div>
                                         <div className="py-4 px-4 flex-[3] whitespace-nowrap">
-                                            {order.name}
+                                            {order.orderName}
                                         </div>
                                         <div className="py-4 px-4 flex-[4] whitespace-nowrap">
-                                            {order.email}
+                                            {order.customerEmail}
                                         </div>
                                         <div className="py-4 px-4 flex-[2] text-center">
                                             <span
-                                                className={`px-3 py-1 text-xs font-medium rounded-full ${order.statusColor}`}
+                                                className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[order.status]}`}
                                             >
                                                 {order.status}
                                             </span>
@@ -185,7 +139,7 @@ export default function OrderTable() {
                                         {/* Delete Button */}
                                         <div className="py-4 px-4 w-18 text-center">
                                             <button
-                                                className="text-red-500 hover:text-red-700"
+                                                className="text-red-500 cursor-pointer hover:text-red-700"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <Trash2 size={18} />
@@ -195,10 +149,14 @@ export default function OrderTable() {
                                 </Accordion.Trigger>
                             </Accordion.Header>
 
-                            {/* Accordion Content - Expanded Details */}
+
                             <Accordion.Content className="">
                                 <div className="p-4 border-t border-[#E5E7EB]">
-                                    <OrderProgress />
+                                    {orderDetails ? (
+                                        <OrderProgress />
+                                    ) : (
+                                        <p className="text-gray-500">Loading order details...</p>
+                                    )}
                                 </div>
                             </Accordion.Content>
                         </Accordion.Item>
