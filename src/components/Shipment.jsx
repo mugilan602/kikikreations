@@ -1,14 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "react-icons/fa";
-
+import useOrderStore from "../store/orderStore";
+import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
+import { addShipmentToOrder } from "../firebase/shipment.js";
 export default function Shipment() {
+    const orderDetails = useOrderStore((state) => state.orderDetails);
+    const [removedFiles, setRemovedFiles] = useState([]);
     const [shipmentData, setShipmentData] = useState({
-        courierEmail: "courier@shipping.com",
-        referenceNumber: "#ORD-2024-001",
-        orderName: "Summer Collection 2024",
-        labelType: "Woven",
+        courierEmail: "",
+        referenceNumber: "",
+        orderName: "",
+        labelType: "",
         orderDetails: "",
     });
+    useEffect(() => {
+        console.log(orderDetails.shipments[0]);
+
+        if (orderDetails?.shipments) {
+            setShipmentData(orderDetails.shipments[0]);
+            const uploadedFiles = orderDetails.shipments[0].files?.map(file => ({
+                file: null,
+                url: file.url,
+                name: file.name,
+            })) || [];
+            setFiles(uploadedFiles);
+            console.log({shipmentData});
+        }
+    }, [orderDetails]);
+
 
     const [files, setFiles] = useState([]);
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
@@ -28,8 +47,10 @@ export default function Shipment() {
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
             file,
-            url: URL.createObjectURL(file), // Generate preview URL
+            url: URL.createObjectURL(file),
+            name: file.name
         }));
+
         setFiles([...files, ...uploadedFiles]);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
@@ -37,6 +58,13 @@ export default function Shipment() {
 
     // Remove file from preview
     const handleRemoveFile = (index) => {
+        const fileToRemove = files[index];
+
+        // If it's an existing file (with a URL), add it to the removal list
+        if (!fileToRemove.file && fileToRemove.url) {
+            setRemovedFiles([...removedFiles, fileToRemove.url]);
+        }
+
         const updatedFiles = files.filter((_, i) => i !== index);
         setFiles(updatedFiles);
         setIsDraftDisabled(false);
@@ -44,24 +72,47 @@ export default function Shipment() {
     };
 
     // Save draft function
-    const handleSaveDraft = () => {
-        console.log("Draft Saved:", shipmentData, files);
+    const handleSaveDraft = async () => {
+        if (!orderDetails?.id) {
+            alert("Order details are missing.");
+            return;
+        }
         setIsDraftDisabled(true);
-        setIsSendEnabled(true);
+        setIsSendEnabled(false);
+        try {
+            const newFiles = files.filter(f => f.file !== null).map(f => f.file);
+            const existingFiles = files.filter(f => f.file === null);
+            let uploadedFiles = [];
+            if (newFiles.length > 0) {
+                uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "shipment", newFiles);
+            }
+            const allFiles = [...existingFiles, ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name }))];
+            await addShipmentToOrder(orderDetails.id, shipmentData, allFiles);
+            if (removedFiles.length > 0) {
+                await deleteFilesFromStorage(removedFiles);
+                setRemovedFiles([]);
+            }
+            alert("Draft saved successfully!");
+            setFiles(allFiles);
+        } catch (error) {
+            alert("Failed to save draft. Please try again.");
+            setIsSaved(false);
+        } finally {
+            setIsDraftDisabled(true);
+            setIsSendEnabled(true);
+        }
     };
 
-    // Get icon and background based on file type
-    const getFileInfo = (fileName) => {
+    const getFileInfo = (file) => {
+        const fileName = file.name || file.url.split('/').pop();
         const extension = fileName.split(".").pop().toLowerCase();
-        if (["pdf"].includes(extension)) {
-            return { icon: <FaFilePdf className="text-red-600" />, bg: "bg-red-100 text-red-700" };
-        }
-        if (["jpg", "jpeg", "png"].includes(extension)) {
-            return { icon: <FaFileImage className="text-blue-600" />, bg: "bg-blue-100 text-blue-700" };
-        }
+        if (["pdf"].includes(extension)) return { icon: <FaFilePdf className="text-red-600" />, bg: "bg-red-100 text-red-700" };
+        if (["jpg", "jpeg", "png"].includes(extension)) return { icon: <FaFileImage className="text-blue-600" />, bg: "bg-blue-100 text-blue-700" };
         return { icon: <FaFileAlt className="text-gray-600" />, bg: "bg-gray-100 text-gray-700" };
     };
 
+    console.log({shipmentData});
+    console.log(files);
     return (
         <div className="py-8 bg-white rounded-lg">
             {/* Courier Email & Reference Number */}
@@ -150,11 +201,11 @@ export default function Shipment() {
                 {/* Uploaded Files List */}
                 {files.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-4">
-                        {files.map(({ file, url }, index) => {
-                            const { icon, bg } = getFileInfo(file.name);
+                        {files.map((file, index) => {
+                            const { icon, bg } = getFileInfo(file);
                             return (
                                 <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                    <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                                         {icon}
                                         <span className="truncate">{file.name}</span>
                                     </a>

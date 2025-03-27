@@ -14,7 +14,7 @@ export const addShipmentToOrder = async (orderId, shipmentData, files) => {
         const sanitizedFiles = Array.isArray(files) ? files : [];
 
         // ✅ Reference to "shipment" subcollection
-        const shipmentRef = collection(db, "orders", orderId, "shipment");
+        const shipmentRef = collection(db, "orders", orderId, "shipments");
 
         // ✅ Check if a shipment document already exists
         const existingQuery = query(shipmentRef);
@@ -23,7 +23,7 @@ export const addShipmentToOrder = async (orderId, shipmentData, files) => {
         if (!existingDocs.empty) {
             // ✅ If document exists, update the first one found
             const existingDoc = existingDocs.docs[0]; // Get first document
-            const shipmentDocRef = doc(db, "orders", orderId, "shipment", existingDoc.id);
+            const shipmentDocRef = doc(db, "orders", orderId, "shipments", existingDoc.id);
 
             await setDoc(shipmentDocRef, {
                 ...shipmentData,
