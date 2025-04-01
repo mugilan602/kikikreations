@@ -1,45 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { FaFilePdf, FaFileImage } from "react-icons/fa6";
-import { FaTimes } from "react-icons/fa";
-import {deleteFilesFromStorage,updateOrder} from "../firebase/order"
+import { FaFilePdf, FaFileImage, FaTimes, FaCloudUploadAlt } from "react-icons/fa";
+import { deleteFilesFromStorage, updateOrder, uploadFiles } from "../firebase/order";
 import useOrderStore from "../store/orderStore";
 
 export default function OrderDetails() {
-    const orderDetails = useOrderStore((state) => state.orderDetails); 
+    const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
+    const [files, setFiles] = useState([]);
     const [details, setDetails] = useState({
         customerEmail: "",
         referenceNumber: "",
         orderName: "",
         labelType: "",
         orderDetails: "",
-        files: [],
     });
-
     const [isChangesDisabled, setIsChangesDisabled] = useState(true);
-    const handleRemoveFile = (index) => {
-        console.log("Removing file at index:", index);
 
-        const fileToRemove = details.files[index];
-        console.log("Files to remove: ", fileToRemove);
-
-        // Update removedFiles state using a functional update
-        setRemovedFiles((prev) => {
-            const updatedRemovedFiles = [...prev, fileToRemove.url];
-            console.log("Updated REMOVED FILES:", updatedRemovedFiles); 
-            return updatedRemovedFiles;
-        });
-
-        // Immediately update UI by removing the file from state
-        setDetails((prevDetails) => ({
-            ...prevDetails,
-            files: prevDetails.files.filter((_, i) => i !== index),
-        }));
-
-        setIsChangesDisabled(false);
-    };
-
-    // Sync state with store data
     useEffect(() => {
         if (orderDetails) {
             setDetails({
@@ -48,10 +24,26 @@ export default function OrderDetails() {
                 orderName: orderDetails.orderName || "",
                 labelType: orderDetails.labelType || "",
                 orderDetails: orderDetails.orderDetails || "",
-                files: orderDetails.files || [],
             });
+
+            const uploadedFiles = orderDetails.files?.map(file => ({
+                file: null,
+                url: file.url,
+                name: file.name,
+            })) || [];
+            setFiles(uploadedFiles);
         }
     }, [orderDetails]);
+
+    const handleFileUpload = (event) => {
+        const uploadedFiles = Array.from(event.target.files).map(file => ({
+            file,
+            url: URL.createObjectURL(file),
+            name: file.name,
+        }));
+        setFiles([...files, ...uploadedFiles]);
+        setIsChangesDisabled(false);
+    };
 
     const handleChange = (e) => {
         setDetails({
@@ -61,26 +53,60 @@ export default function OrderDetails() {
         setIsChangesDisabled(false);
     };
 
+    const handleRemoveFile = (index) => {
+        const fileToRemove = files[index];
+        if (!fileToRemove.file && fileToRemove.url) {
+            setRemovedFiles((prev) => [...prev, fileToRemove.url]);
+        }
+        const updatedFiles = files.filter((_, i) => i !== index);
+        setFiles(updatedFiles);
+        setIsChangesDisabled(false);
+    };
+
     const handleSaveChanges = async () => {
-        console.log(details,orderDetails);
+        if (!orderDetails?.id || !orderDetails?.referenceNumber) {
+            console.error("Order ID or reference number is missing.");
+            return;
+        }
+
         try {
+            const newFiles = files.filter(f => f.file !== null).map(f => f.file);
+            const existingFiles = files.filter(f => f.file === null);
+            let uploadedFiles = [];
+            if (newFiles.length > 0) {
+                uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "order", newFiles);
+            }
+            const allFiles = [
+                ...existingFiles,
+                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
+            ];
+            const updatedDetails = { ...details, files: allFiles };
+
             if (removedFiles.length > 0) {
-                console.log("Deleting selected files from Firebase Storage...");
                 await deleteFilesFromStorage(removedFiles);
+                setRemovedFiles([]);
             }
 
-            console.log("Updating Firestore with new file list...",orderDetails.id);
-            await updateOrder(orderDetails.id, details);
+            // Update Firestore with the new details
+            await updateOrder(orderDetails.id, updatedDetails);
 
-            console.log("Firestore update successful.");
-            useOrderStore.setState({ orderDetails: {id: orderDetails.id,...details}})
-            setRemovedFiles([]);
+            // Merge updatedDetails with the existing orderDetails to preserve subcollections
+            const mergedOrderDetails = {
+                ...orderDetails, // Keep all existing fields, including subcollections
+                ...updatedDetails, // Overwrite only the updated top-level fields
+                id: orderDetails.id, // Ensure id is preserved
+            };
+
+            // Update the store with the merged object
+            useOrderStore.setState({ orderDetails: mergedOrderDetails });
+
+            setFiles(allFiles);
+            setIsChangesDisabled(true);
         } catch (error) {
             console.error("Error during save:", error);
-        } finally {
-            setIsChangesDisabled(true);
         }
     };
+
     const truncateFileName = (name, maxLength = 20) => {
         if (name.length > maxLength) {
             const extIndex = name.lastIndexOf(".");
@@ -90,14 +116,22 @@ export default function OrderDetails() {
         }
         return name;
     };
-    const getFileInfo = (fileName) => ({
-        icon: fileName.endsWith(".pdf") ? <FaFilePdf size={18} className="text-red-600" /> : <FaFileImage size={18} className="text-blue-600" />,
-        bg: fileName.endsWith(".pdf") ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700",
-    });
+
+    const getFileInfo = (file) => {
+        const fileName = file.name || file.url.split('/').pop();
+        const extension = fileName.split(".").pop().toLowerCase();
+
+        if (["pdf"].includes(extension)) {
+            return { icon: <FaFilePdf size={18} className="text-red-600" />, bg: "bg-red-100 text-red-700" };
+        }
+        if (["jpg", "jpeg", "png"].includes(extension)) {
+            return { icon: <FaFileImage size={18} className="text-blue-600" />, bg: "bg-blue-100 text-blue-700" };
+        }
+        return { icon: <FaFileImage size={18} className="text-gray-600" />, bg: "bg-gray-100 text-gray-700" };
+    };
 
     return (
         <div className="bg-white py-8 rounded-lg">
-            {/* Order Details Section */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Customer Email</label>
@@ -144,7 +178,6 @@ export default function OrderDetails() {
                 </div>
             </div>
 
-            {/* Order Details Text Area */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Order Details</label>
                 <textarea
@@ -156,42 +189,56 @@ export default function OrderDetails() {
                 />
             </div>
 
-            {/* Attachments */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                    {details.files.map((file, index) => {
-                        const { icon, bg } = getFileInfo(file.name);
-
-                        return (
-                            <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
-                                    {icon}
-                                    <span className="truncate">{truncateFileName(file.name)}</span>
-                                </a>
-
-                                {/* Close Button */}
-                                <button
-                                    onClick={() => handleRemoveFile(index)}
-                                    className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-1 text-xs hover:bg-red-600"
-                                >
-                                    <FaTimes />
-                                </button>
-                            </div>
-                        );
-                    })}
+                <div
+                    className="mt-4 border-2 border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:border-gray-500"
+                    onClick={() => document.getElementById("fileUpload").click()}
+                >
+                    <input
+                        type="file"
+                        id="fileUpload"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        accept=".png,.jpg,.jpeg,.pdf"
+                    />
+                    <div className="text-gray-500">
+                        <FaCloudUploadAlt size={30} className="mx-auto" />
+                        <p>Upload a file or drag & drop </p>
+                        <p className="text-xs mt-1">PNG, JPG, PDF up to 10MB</p>
+                    </div>
                 </div>
+
+                {files.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {files.map((file, index) => {
+                            const { icon, bg } = getFileInfo(file);
+                            return (
+                                <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
+                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                        {icon}
+                                        <span className="truncate">{truncateFileName(file.name || "Uploaded File")}</span>
+                                    </a>
+                                    <button
+                                        onClick={() => handleRemoveFile(index)}
+                                        className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-1 text-xs hover:bg-red-600"
+                                    >
+                                        <FaTimes />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            {/* Buttons */}
             <div className="flex justify-end gap-3">
                 <button className="px-4 py-2 bg-white font-medium border border-gray-400 text-red-600 rounded-md">
                     Delete Order
                 </button>
-
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"
-                        }`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
                     onClick={handleSaveChanges}
                     disabled={isChangesDisabled}
                 >
