@@ -25,55 +25,46 @@ export default function Sampling() {
                 samplingInstructions: firstSampling.samplingInstructions || "",
             });
 
-            // Initialize `files` state with existing Firebase URLs
             const uploadedFiles = firstSampling.files?.map(file => ({
-                file: null,  // No actual file object, only URL exists
+                file: null,
                 url: file.url,
                 name: file.name,
             })) || [];
-
             setFiles(uploadedFiles);
         }
     }, [orderDetails]);
 
-    // Handle new file uploads
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
             file,
             url: URL.createObjectURL(file),
-            name: file.name
+            name: file.name,
         }));
         setFiles([...files, ...uploadedFiles]);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Handle input changes
     const handleChange = (e) => {
         setDetails({
             ...details,
-            [e.target.name]: e.target.value
+            [e.target.name]: e.target.value,
         });
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Remove file from preview
     const handleRemoveFile = (index) => {
         const fileToRemove = files[index];
-
-        // If it's an existing file (with a URL), add it to the removal list
         if (!fileToRemove.file && fileToRemove.url) {
             setRemovedFiles([...removedFiles, fileToRemove.url]);
         }
-
         const updatedFiles = files.filter((_, i) => i !== index);
         setFiles(updatedFiles);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Save draft
     const handleSaveDraft = async () => {
         if (!orderDetails?.id || !orderDetails?.referenceNumber) {
             alert("Order details are missing.");
@@ -84,49 +75,71 @@ export default function Sampling() {
         setIsSendEnabled(false);
 
         try {
-            // Separate new files (File objects) and existing files (URLs)
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
-            const existingFiles = files.filter(f => f.file === null); // Already stored URLs
-
-            // Upload new files if any
+            const existingFiles = files.filter(f => f.file === null);
             let uploadedFiles = [];
             if (newFiles.length > 0) {
                 uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "sampling", newFiles);
             }
 
-            // Merge previously stored files with new uploaded ones
             const allFiles = [
-                ...existingFiles, // Keep old files
-                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })) // Add new files
+                ...existingFiles,
+                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
             ];
 
             const samplingData = {
                 vendorEmail: details.vendorEmail || "",
                 samplingInstructions: details.samplingInstructions || "",
+                files: allFiles,
+                updatedAt: new Date(), // Match Firestore's Timestamp.now()
             };
 
-            // Save data to Firestore
-            await addSamplingToOrder(orderDetails.id, samplingData, allFiles);
+            // Save to Firestore and get the sampling document ID
+            const samplingId = await addSamplingToOrder(orderDetails.id, samplingData, allFiles);
+
             if (removedFiles.length > 0) {
                 await deleteFilesFromStorage(removedFiles);
                 setRemovedFiles([]);
             }
-            alert("Draft saved successfully!");
 
-            // Update files state to include both old and new files
+            // Construct the updated sampling object
+            const updatedSampling = {
+                ...samplingData,
+                id: samplingId,
+                ...(orderDetails.sampling?.length > 0
+                    ? { createdAt: orderDetails.sampling[0].createdAt } // Preserve original createdAt if updating
+                    : { createdAt: new Date() }), // Add createdAt if new
+            };
+
+            // Update the sampling array in orderDetails
+            const updatedSamplingArray = orderDetails.sampling?.length > 0
+                ? orderDetails.sampling.map((sampling, index) =>
+                    index === 0 ? updatedSampling : sampling)
+                : [updatedSampling];
+
+            const mergedOrderDetails = {
+                ...orderDetails,
+                sampling: updatedSamplingArray,
+            };
+
+            // Update the store
+            useOrderStore.setState({ orderDetails: mergedOrderDetails });
+
+            // Update local files state
             setFiles(allFiles);
             setIsDraftDisabled(true);
             setIsSendEnabled(true);
+
+            alert("Draft saved successfully!");
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsDraftDisabled(false);
+            console.error("Error saving draft:", error);
         }
     };
 
-
-    // Get file info based on name or url
     const getFileInfo = (file) => {
-        const fileName = file.name || file.url.split('/').pop(); // Extract filename from URL if needed
+        const fileName = file.name || file.url.split('/').pop();
         const extension = fileName.split(".").pop().toLowerCase();
 
         if (["pdf"].includes(extension)) {
@@ -140,7 +153,6 @@ export default function Sampling() {
 
     return (
         <div className="py-8 bg-white rounded-lg">
-            {/* Vendor Email */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Vendor Email</label>
                 <input
@@ -153,7 +165,6 @@ export default function Sampling() {
                 />
             </div>
 
-            {/* File Upload Section */}
             <div className="py-6 bg-white rounded-lg">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
                 <div
@@ -175,7 +186,6 @@ export default function Sampling() {
                     </div>
                 </div>
 
-                {/* File Preview */}
                 {files.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2">
                         {files.map((file, index) => {
@@ -199,7 +209,6 @@ export default function Sampling() {
                 )}
             </div>
 
-            {/* Sampling Instructions */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Sampling Instructions</label>
                 <textarea
@@ -212,15 +221,21 @@ export default function Sampling() {
                 ></textarea>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end gap-3">
                 <button className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md">
                     Cancel
                 </button>
-                <button className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`} onClick={handleSaveDraft} disabled={isDraftDisabled}>
+                <button
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
+                    onClick={handleSaveDraft}
+                    disabled={isDraftDisabled}
+                >
                     Save Draft
                 </button>
-                <button className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`} disabled={!isSendEnabled}>
+                <button
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
+                    disabled={!isSendEnabled}
+                >
                     Send to Vendor
                 </button>
             </div>

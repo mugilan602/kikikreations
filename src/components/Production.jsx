@@ -3,12 +3,13 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addProductionToOrder } from "../firebase/production.js";
+import { addShipmentToOrder } from "../firebase/shipment.js"; // Import shipment function
+
 export default function Production() {
     const orderDetails = useOrderStore((state) => state.orderDetails);
 
     const [files, setFiles] = useState([]);
-    const [isSaved, setIsSaved] = useState(true); // Track if changes exist
-
+    const [isSaved, setIsSaved] = useState(true);
     const [removedFiles, setRemovedFiles] = useState([]);
 
     const [details, setDetails] = useState({
@@ -16,6 +17,7 @@ export default function Production() {
         quantity: "",
         notes: "",
     });
+
     useEffect(() => {
         if (orderDetails?.production?.length > 0) {
             const firstProduction = orderDetails.production[0];
@@ -23,53 +25,46 @@ export default function Production() {
                 vendorEmail: firstProduction.vendorEmail || "",
                 quantity: firstProduction.quantity || "",
                 notes: firstProduction.notes || "",
-            })
+            });
             const uploadedFiles = firstProduction.files?.map(file => ({
-                file: null,  // No actual file object, only URL exists
+                file: null,
                 url: file.url,
                 name: file.name,
             })) || [];
-
             setFiles(uploadedFiles);
         }
-    }, [])
-    // Handle file upload
+    }, [orderDetails]);
+
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
             file,
             url: URL.createObjectURL(file),
-            name: file.name
+            name: file.name,
         }));
         setFiles([...files, ...uploadedFiles]);
         setIsSaved(false);
     };
 
-    // Remove file from list
     const handleRemoveFile = (index) => {
         const fileToRemove = files[index];
-
-        // If it's an existing file (with a URL), add it to the removal list
         if (!fileToRemove.file && fileToRemove.url) {
             setRemovedFiles([...removedFiles, fileToRemove.url]);
         }
-
         const updatedFiles = files.filter((_, i) => i !== index);
         setFiles(updatedFiles);
         setIsSaved(false);
     };
 
-    // Handle input changes
     const handleChange = (e) => {
         setDetails({
             ...details,
-            [e.target.name]: e.target.value
+            [e.target.name]: e.target.value,
         });
         setIsSaved(false);
     };
 
-    // Save Draft action
     const handleSaveDraft = async () => {
-        if (!orderDetails?.id) {
+        if (!orderDetails?.id || !orderDetails?.referenceNumber) {
             alert("Order details are missing.");
             return;
         }
@@ -77,47 +72,111 @@ export default function Production() {
         setIsSaved(true);
 
         try {
-            // Separate new files (File objects) and existing files (URLs)
+            // Handle production files
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
-            const existingFiles = files.filter(f => f.file === null); // Already stored URLs
-
-            // Upload new files if any
+            const existingFiles = files.filter(f => f.file === null);
             let uploadedFiles = [];
             if (newFiles.length > 0) {
                 uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "production", newFiles);
             }
 
-            // Merge previously stored files with new uploaded ones
-            const allFiles = [
-                ...existingFiles, // Keep old files
-                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })) // Add new files
+            const allProductionFiles = [
+                ...existingFiles,
+                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
             ];
 
             const productionData = {
                 vendorEmail: details.vendorEmail || "",
                 quantity: details.quantity || "",
                 notes: details.notes || "",
+                files: allProductionFiles,
+                updatedAt: new Date(),
             };
 
-            // Save data to Firestore
-            await addProductionToOrder(orderDetails.id, productionData, allFiles);
+            // Save production data and get the production document ID
+            const productionId = await addProductionToOrder(orderDetails.id, productionData, allProductionFiles);
+
             if (removedFiles.length > 0) {
                 await deleteFilesFromStorage(removedFiles);
                 setRemovedFiles([]);
             }
-            alert("Draft saved successfully!");
 
-            // Update files state to include both old and new files
-            setFiles(allFiles);
+            // Construct updated production object
+            const updatedProduction = {
+                ...productionData,
+                id: productionId,
+                ...(orderDetails.production?.length > 0
+                    ? { createdAt: orderDetails.production[0].createdAt }
+                    : { createdAt: new Date() }),
+            };
+
+            const updatedProductionArray = orderDetails.production?.length > 0
+                ? orderDetails.production.map((production, index) =>
+                    index === 0 ? updatedProduction : production)
+                : [updatedProduction];
+
+            // Handle shipment update with production files
+            const existingShipment = orderDetails.shipments?.length > 0 ? orderDetails.shipments[0] : null;
+            const existingShipmentFiles = existingShipment?.files || [];
+
+            // Merge production files with existing shipment files, avoiding duplicates by URL
+            const allShipmentFiles = [
+                ...existingShipmentFiles.filter(shipFile =>
+                    !allProductionFiles.some(prodFile => prodFile.url === shipFile.url)),
+                ...allProductionFiles,
+            ];
+
+            const shipmentData = {
+                courierEmail: existingShipment?.courierEmail || "",
+                referenceNumber: existingShipment?.referenceNumber || orderDetails.referenceNumber || "",
+                orderName: existingShipment?.orderName || orderDetails.orderName || "",
+                labelType: existingShipment?.labelType || orderDetails.labelType || "",
+                orderDetails: existingShipment?.orderDetails || "",
+                files: allShipmentFiles,
+                updatedAt: new Date(),
+            };
+
+            // Save or update shipment data
+            const shipmentId = await addShipmentToOrder(orderDetails.id, shipmentData, allShipmentFiles);
+
+            // Construct updated shipment object
+            const updatedShipment = {
+                ...shipmentData,
+                id: shipmentId,
+                ...(existingShipment
+                    ? { createdAt: existingShipment.createdAt }
+                    : { createdAt: new Date() }),
+            };
+
+            const updatedShipmentsArray = orderDetails.shipments?.length > 0
+                ? orderDetails.shipments.map((shipment, index) =>
+                    index === 0 ? updatedShipment : shipment)
+                : [updatedShipment];
+
+            // Merge both production and shipment updates into orderDetails
+            const mergedOrderDetails = {
+                ...orderDetails,
+                production: updatedProductionArray,
+                shipments: updatedShipmentsArray,
+            };
+
+            // Update the store
+            useOrderStore.setState({ orderDetails: mergedOrderDetails });
+
+            // Update local files state (for production UI)
+            setFiles(allProductionFiles);
             setIsSaved(true);
+
+            alert("Draft saved successfully! Production files added to shipments.");
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsSaved(false);
+            console.error("Error saving draft:", error);
         }
     };
-    // Get file info based on name or url
+
     const getFileInfo = (file) => {
-        const fileName = file.name || file.url.split('/').pop(); // Extract filename from URL if needed
+        const fileName = file.name || file.url.split('/').pop();
         const extension = fileName.split(".").pop().toLowerCase();
 
         if (["pdf"].includes(extension)) {
@@ -129,10 +188,8 @@ export default function Production() {
         return { icon: <FaFileAlt className="text-gray-600" />, bg: "bg-gray-100 text-gray-700" };
     };
 
-
     return (
         <div className="py-8 bg-white rounded-lg">
-            {/* Vendor Email & Quantity */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Vendor Email</label>
@@ -158,11 +215,8 @@ export default function Production() {
                 </div>
             </div>
 
-            {/* Design Files Upload */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Design Files</label>
-
-                {/* Upload Box */}
                 <div
                     className="mt-4 border-2 border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:border-gray-500"
                     onClick={() => document.getElementById("fileUpload").click()}
@@ -183,7 +237,6 @@ export default function Production() {
                 </div>
             </div>
 
-            {/* Uploaded Files List */}
             {files.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-4">
                     {files.map((file, index) => {
@@ -194,7 +247,6 @@ export default function Production() {
                                     {icon}
                                     <span className="truncate">{file.name}</span>
                                 </a>
-                                {/* Remove File Button */}
                                 <button
                                     onClick={() => handleRemoveFile(index)}
                                     className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-1 text-xs hover:bg-red-600"
@@ -207,7 +259,6 @@ export default function Production() {
                 </div>
             )}
 
-            {/* Production Notes */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Production Notes</label>
                 <textarea
@@ -220,7 +271,6 @@ export default function Production() {
                 ></textarea>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end gap-3">
                 <button className="px-4 py-2 border border-gray-400 text-red-600 font-semibold rounded-md">
                     Cancel
@@ -228,15 +278,13 @@ export default function Production() {
                 <button
                     onClick={handleSaveDraft}
                     disabled={isSaved}
-                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"
-                        }`}
+                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"}`}
                 >
                     Save Draft
                 </button>
                 <button
                     disabled={!isSaved}
-                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                        }`}
+                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"}`}
                 >
                     Send to production
                 </button>

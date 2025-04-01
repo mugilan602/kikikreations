@@ -3,6 +3,7 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addShipmentToOrder } from "../firebase/shipment.js";
+
 export default function Shipment() {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
@@ -13,27 +14,29 @@ export default function Shipment() {
         labelType: "",
         orderDetails: "",
     });
-    useEffect(() => {
-        console.log(orderDetails.shipments[0]);
+    const [files, setFiles] = useState([]);
+    const [isDraftDisabled, setIsDraftDisabled] = useState(true);
+    const [isSendEnabled, setIsSendEnabled] = useState(true);
 
-        if (orderDetails?.shipments) {
-            setShipmentData(orderDetails.shipments[0]);
-            const uploadedFiles = orderDetails.shipments[0].files?.map(file => ({
+    useEffect(() => {
+        if (orderDetails?.shipments?.length > 0) {
+            const firstShipment = orderDetails.shipments[0];
+            setShipmentData({
+                courierEmail: firstShipment.courierEmail || "",
+                referenceNumber: firstShipment.referenceNumber || "",
+                orderName: firstShipment.orderName || "",
+                labelType: firstShipment.labelType || "",
+                orderDetails: firstShipment.orderDetails || "",
+            });
+            const uploadedFiles = firstShipment.files?.map(file => ({
                 file: null,
                 url: file.url,
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
-            console.log({shipmentData});
         }
     }, [orderDetails]);
 
-
-    const [files, setFiles] = useState([]);
-    const [isDraftDisabled, setIsDraftDisabled] = useState(true);
-    const [isSendEnabled, setIsSendEnabled] = useState(true);
-
-    // Handle input changes
     const handleChange = (e) => {
         setShipmentData({
             ...shipmentData,
@@ -43,42 +46,37 @@ export default function Shipment() {
         setIsSendEnabled(false);
     };
 
-    // Handle file upload
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
             file,
             url: URL.createObjectURL(file),
-            name: file.name
+            name: file.name,
         }));
-
         setFiles([...files, ...uploadedFiles]);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Remove file from preview
     const handleRemoveFile = (index) => {
         const fileToRemove = files[index];
-
-        // If it's an existing file (with a URL), add it to the removal list
         if (!fileToRemove.file && fileToRemove.url) {
             setRemovedFiles([...removedFiles, fileToRemove.url]);
         }
-
         const updatedFiles = files.filter((_, i) => i !== index);
         setFiles(updatedFiles);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Save draft function
     const handleSaveDraft = async () => {
-        if (!orderDetails?.id) {
+        if (!orderDetails?.id || !orderDetails?.referenceNumber) {
             alert("Order details are missing.");
             return;
         }
+
         setIsDraftDisabled(true);
         setIsSendEnabled(false);
+
         try {
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
             const existingFiles = files.filter(f => f.file === null);
@@ -86,20 +84,59 @@ export default function Shipment() {
             if (newFiles.length > 0) {
                 uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "shipment", newFiles);
             }
-            const allFiles = [...existingFiles, ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name }))];
-            await addShipmentToOrder(orderDetails.id, shipmentData, allFiles);
+            const allFiles = [
+                ...existingFiles,
+                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
+            ];
+
+            const updatedShipmentData = {
+                ...shipmentData,
+                files: allFiles,
+                updatedAt: new Date(), // Approximate Timestamp.now()
+            };
+
+            // Save to Firestore and get the shipment document ID
+            const shipmentId = await addShipmentToOrder(orderDetails.id, updatedShipmentData, allFiles);
+
             if (removedFiles.length > 0) {
                 await deleteFilesFromStorage(removedFiles);
                 setRemovedFiles([]);
             }
-            alert("Draft saved successfully!");
+
+            // Construct the updated shipment object
+            const updatedShipment = {
+                ...updatedShipmentData,
+                id: shipmentId,
+                ...(orderDetails.shipments?.length > 0
+                    ? { createdAt: orderDetails.shipments[0].createdAt } // Preserve original createdAt if updating
+                    : { createdAt: new Date() }), // Add createdAt if new
+            };
+
+            // Update the shipments array in orderDetails
+            const updatedShipmentsArray = orderDetails.shipments?.length > 0
+                ? orderDetails.shipments.map((shipment, index) =>
+                    index === 0 ? updatedShipment : shipment)
+                : [updatedShipment];
+
+            const mergedOrderDetails = {
+                ...orderDetails,
+                shipments: updatedShipmentsArray,
+            };
+
+            // Update the store
+            useOrderStore.setState({ orderDetails: mergedOrderDetails });
+
+            // Update local files state
             setFiles(allFiles);
-        } catch (error) {
-            alert("Failed to save draft. Please try again.");
-            setIsSaved(false);
-        } finally {
             setIsDraftDisabled(true);
             setIsSendEnabled(true);
+
+            alert("Draft saved successfully!");
+        } catch (error) {
+            alert("Failed to save draft. Please try again.");
+            setIsDraftDisabled(false);
+            setIsSendEnabled(false);
+            console.error("Error saving draft:", error);
         }
     };
 
@@ -111,11 +148,8 @@ export default function Shipment() {
         return { icon: <FaFileAlt className="text-gray-600" />, bg: "bg-gray-100 text-gray-700" };
     };
 
-    console.log({shipmentData});
-    console.log(files);
     return (
         <div className="py-8 bg-white rounded-lg">
-            {/* Courier Email & Reference Number */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Courier Email</label>
@@ -139,7 +173,6 @@ export default function Shipment() {
                 </div>
             </div>
 
-            {/* Order Name & Label Type */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Order Name</label>
@@ -163,7 +196,6 @@ export default function Shipment() {
                 </div>
             </div>
 
-            {/* Order Details */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Order Details</label>
                 <textarea
@@ -176,7 +208,6 @@ export default function Shipment() {
                 ></textarea>
             </div>
 
-            {/* Attachments */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
                 <div
@@ -198,7 +229,6 @@ export default function Shipment() {
                     </div>
                 </div>
 
-                {/* Uploaded Files List */}
                 {files.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-4">
                         {files.map((file, index) => {
@@ -222,12 +252,10 @@ export default function Shipment() {
                 )}
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end gap-3">
                 <button className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md">
                     Cancel
                 </button>
-
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
                     onClick={handleSaveDraft}
@@ -235,7 +263,6 @@ export default function Shipment() {
                 >
                     Save Draft
                 </button>
-
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
                     disabled={!isSendEnabled}
