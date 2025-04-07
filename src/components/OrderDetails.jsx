@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { FaFilePdf, FaFileImage, FaTimes, FaCloudUploadAlt } from "react-icons/fa";
 import { deleteFilesFromStorage, updateOrder, uploadFiles } from "../firebase/order";
 import useOrderStore from "../store/orderStore";
+import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
 
-export default function OrderDetails() {
+function OrderDetails({ onSendClick }) { // Add onSendClick prop
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
     const [files, setFiles] = useState([]);
@@ -15,6 +16,7 @@ export default function OrderDetails() {
         orderDetails: "",
     });
     const [isChangesDisabled, setIsChangesDisabled] = useState(true);
+    const [canSendEmail, setCanSendEmail] = useState(false); // New state for send button
 
     useEffect(() => {
         if (orderDetails) {
@@ -32,6 +34,9 @@ export default function OrderDetails() {
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
+
+            // Enable send button if we have data
+            setCanSendEmail(!!orderDetails.customerEmail);
         }
     }, [orderDetails]);
 
@@ -102,8 +107,20 @@ export default function OrderDetails() {
 
             setFiles(allFiles);
             setIsChangesDisabled(true);
+            setCanSendEmail(true); // Enable send button after saving
         } catch (error) {
             console.error("Error during save:", error);
+        }
+    };
+
+    // Add function to handle Send Email button click
+    const handleSendEmail = () => {
+        if (onSendClick) {
+            // Pass details and files to the email preview
+            onSendClick({
+                ...details,
+                files
+            });
         }
     };
 
@@ -244,7 +261,17 @@ export default function OrderDetails() {
                 >
                     Save Changes
                 </button>
+                <button
+                    className={`px-4 py-2 font-medium text-white rounded-md ${canSendEmail ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
+                    onClick={handleSendEmail}
+                    disabled={!canSendEmail}
+                >
+                    Send to Customer
+                </button>
             </div>
         </div>
     );
 }
+
+// Export with the HOC wrapper
+export default withEmailPreview(OrderDetails, 'orderDetails');

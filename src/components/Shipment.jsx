@@ -3,8 +3,9 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addShipmentToOrder } from "../firebase/shipment.js";
+import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
 
-export default function Shipment() {
+function Shipment({ onSendClick }) { // Add onSendClick prop
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
     const [shipmentData, setShipmentData] = useState({
@@ -16,7 +17,7 @@ export default function Shipment() {
     });
     const [files, setFiles] = useState([]);
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
-    const [isSendEnabled, setIsSendEnabled] = useState(true);
+    const [isSendEnabled, setIsSendEnabled] = useState(false);
 
     useEffect(() => {
         if (orderDetails?.shipments?.length > 0) {
@@ -34,8 +35,11 @@ export default function Shipment() {
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
+
+            // Enable send button if courier email is present and draft is saved
+            setIsSendEnabled(!!firstShipment.courierEmail && isDraftDisabled);
         }
-    }, [orderDetails]);
+    }, [orderDetails, isDraftDisabled]);
 
     const handleChange = (e) => {
         setShipmentData({
@@ -66,6 +70,17 @@ export default function Shipment() {
         setFiles(updatedFiles);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
+    };
+
+    // Add function to handle Send Email button click
+    const handleSendEmail = () => {
+        if (onSendClick) {
+            // Pass shipment data and files to the email preview
+            onSendClick({
+                ...shipmentData,
+                files
+            });
+        }
     };
 
     const handleSaveDraft = async () => {
@@ -129,7 +144,9 @@ export default function Shipment() {
             // Update local files state
             setFiles(allFiles);
             setIsDraftDisabled(true);
-            setIsSendEnabled(true);
+
+            // Enable send button if courier email is present
+            setIsSendEnabled(!!shipmentData.courierEmail);
 
             alert("Draft saved successfully!");
         } catch (error) {
@@ -265,11 +282,15 @@ export default function Shipment() {
                 </button>
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
+                    onClick={handleSendEmail}
                     disabled={!isSendEnabled}
                 >
-                    Send to Shipment
+                    Send to Courier
                 </button>
             </div>
         </div>
     );
 }
+
+// Export with the HOC wrapper
+export default withEmailPreview(Shipment, 'shipment');

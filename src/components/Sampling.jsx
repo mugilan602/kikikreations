@@ -3,12 +3,13 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addSamplingToOrder } from "../firebase/sampling.js";
+import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
 
-export default function Sampling() {
+function Sampling({ onSendClick }) { // Add onSendClick prop
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [files, setFiles] = useState([]);
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
-    const [isSendEnabled, setIsSendEnabled] = useState(true);
+    const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
 
     const [details, setDetails] = useState({
@@ -31,6 +32,12 @@ export default function Sampling() {
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
+
+            // If we have vendor email and either instructions or files, enable send button
+            setIsSendEnabled(
+                !!firstSampling.vendorEmail &&
+                (!!firstSampling.samplingInstructions || uploadedFiles.length > 0)
+            );
         }
     }, [orderDetails]);
 
@@ -128,13 +135,29 @@ export default function Sampling() {
             // Update local files state
             setFiles(allFiles);
             setIsDraftDisabled(true);
-            setIsSendEnabled(true);
+
+            // Enable send button if we have vendor email and either instructions or files
+            setIsSendEnabled(
+                !!details.vendorEmail &&
+                (!!details.samplingInstructions || allFiles.length > 0)
+            );
 
             alert("Draft saved successfully!");
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsDraftDisabled(false);
             console.error("Error saving draft:", error);
+        }
+    };
+
+    // Add function to handle Send Email button click
+    const handleSendEmail = () => {
+        if (onSendClick) {
+            // Pass details and files to the email preview
+            onSendClick({
+                ...details,
+                files
+            });
         }
     };
 
@@ -234,6 +257,7 @@ export default function Sampling() {
                 </button>
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
+                    onClick={handleSendEmail}
                     disabled={!isSendEnabled}
                 >
                     Send to Vendor
@@ -242,3 +266,6 @@ export default function Sampling() {
         </div>
     );
 }
+
+// Export with the HOC wrapper
+export default withEmailPreview(Sampling, 'sampling');

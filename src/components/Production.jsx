@@ -4,12 +4,14 @@ import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addProductionToOrder } from "../firebase/production.js";
 import { addShipmentToOrder } from "../firebase/shipment.js"; // Import shipment function
+import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
 
-export default function Production() {
+function Production({ onSendClick }) { // Add onSendClick prop
     const orderDetails = useOrderStore((state) => state.orderDetails);
 
     const [files, setFiles] = useState([]);
     const [isSaved, setIsSaved] = useState(true);
+    const [canSendToProduction, setCanSendToProduction] = useState(false); // New state for send button
     const [removedFiles, setRemovedFiles] = useState([]);
 
     const [details, setDetails] = useState({
@@ -32,8 +34,11 @@ export default function Production() {
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
+
+            // Check if we can enable send button - vendor email must be present
+            setCanSendToProduction(!!firstProduction.vendorEmail && isSaved);
         }
-    }, [orderDetails]);
+    }, [orderDetails, isSaved]);
 
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
@@ -61,6 +66,17 @@ export default function Production() {
             [e.target.name]: e.target.value,
         });
         setIsSaved(false);
+    };
+
+    // Add function to handle Send Email button click
+    const handleSendEmail = () => {
+        if (onSendClick) {
+            // Pass details and files to the email preview
+            onSendClick({
+                ...details,
+                files
+            });
+        }
     };
 
     const handleSaveDraft = async () => {
@@ -166,6 +182,9 @@ export default function Production() {
             // Update local files state (for production UI)
             setFiles(allProductionFiles);
             setIsSaved(true);
+
+            // Update send button state
+            setCanSendToProduction(!!details.vendorEmail);
 
             alert("Draft saved successfully! Production files added to shipments.");
         } catch (error) {
@@ -283,8 +302,9 @@ export default function Production() {
                     Save Draft
                 </button>
                 <button
-                    disabled={!isSaved}
-                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"}`}
+                    onClick={handleSendEmail}
+                    disabled={!canSendToProduction}
+                    className={`px-4 py-2 font-medium rounded-md ${canSendToProduction ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"}`}
                 >
                     Send to production
                 </button>
@@ -292,3 +312,6 @@ export default function Production() {
         </div>
     );
 }
+
+// Export with the HOC wrapper
+export default withEmailPreview(Production, 'production');
