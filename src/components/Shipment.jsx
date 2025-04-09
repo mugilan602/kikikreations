@@ -1,11 +1,12 @@
+// Shipment.jsx
 import React, { useState, useEffect } from "react";
 import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "react-icons/fa";
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addShipmentToOrder } from "../firebase/shipment.js";
-import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
+import { withEmailPreview } from "./withEmailPreview";
 
-function Shipment({ onSendClick }) { // Add onSendClick prop
+function Shipment({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
     const [shipmentData, setShipmentData] = useState({
@@ -35,17 +36,18 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
-
-            // Enable send button if courier email is present and draft is saved
-            setIsSendEnabled(!!firstShipment.courierEmail && isDraftDisabled);
+            setIsSendEnabled(
+                !!firstShipment.courierEmail &&
+                (uploadedFiles.length > 0 || !!firstShipment.orderDetails || !!firstShipment.referenceNumber)
+            );
         }
-    }, [orderDetails, isDraftDisabled]);
+    }, [orderDetails]);
 
     const handleChange = (e) => {
-        setShipmentData({
-            ...shipmentData,
+        setShipmentData(prev => ({
+            ...prev,
             [e.target.name]: e.target.value,
-        });
+        }));
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
@@ -56,7 +58,7 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
             url: URL.createObjectURL(file),
             name: file.name,
         }));
-        setFiles([...files, ...uploadedFiles]);
+        setFiles(prevFiles => [...prevFiles, ...uploadedFiles]);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
@@ -64,23 +66,31 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
     const handleRemoveFile = (index) => {
         const fileToRemove = files[index];
         if (!fileToRemove.file && fileToRemove.url) {
-            setRemovedFiles([...removedFiles, fileToRemove.url]);
+            setRemovedFiles(prev => [...prev, fileToRemove.url]);
         }
-        const updatedFiles = files.filter((_, i) => i !== index);
-        setFiles(updatedFiles);
+        setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
     };
 
-    // Add function to handle Send Email button click
     const handleSendEmail = () => {
-        if (onSendClick) {
-            // Pass shipment data and files to the email preview
-            onSendClick({
-                ...shipmentData,
-                files
-            });
+        if (!onSendClick || !orderDetails?.id) return;
+
+        // Make sure we have valid data
+        if (!shipmentData.courierEmail) {
+            alert("Courier email is required");
+            return;
         }
+
+        onSendClick({
+            to: shipmentData.courierEmail,
+            referenceNumber: shipmentData.referenceNumber,
+            orderName: shipmentData.orderName,
+            labelType: shipmentData.labelType,
+            orderDetails: shipmentData.orderDetails,
+            files: files,
+            orderId: orderDetails.id
+        });
     };
 
     const handleSaveDraft = async () => {
@@ -106,11 +116,10 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
 
             const updatedShipmentData = {
                 ...shipmentData,
-                files: allFiles,
-                updatedAt: new Date(), // Approximate Timestamp.now()
+                files: allFiles.map(({ url, name }) => ({ url, name })),
+                updatedAt: new Date(),
             };
 
-            // Save to Firestore and get the shipment document ID
             const shipmentId = await addShipmentToOrder(orderDetails.id, updatedShipmentData, allFiles);
 
             if (removedFiles.length > 0) {
@@ -118,19 +127,18 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                 setRemovedFiles([]);
             }
 
-            // Construct the updated shipment object
             const updatedShipment = {
                 ...updatedShipmentData,
                 id: shipmentId,
                 ...(orderDetails.shipments?.length > 0
-                    ? { createdAt: orderDetails.shipments[0].createdAt } // Preserve original createdAt if updating
-                    : { createdAt: new Date() }), // Add createdAt if new
+                    ? { createdAt: orderDetails.shipments[0].createdAt }
+                    : { createdAt: new Date() }),
             };
 
-            // Update the shipments array in orderDetails
             const updatedShipmentsArray = orderDetails.shipments?.length > 0
                 ? orderDetails.shipments.map((shipment, index) =>
-                    index === 0 ? updatedShipment : shipment)
+                    index === 0 ? updatedShipment : shipment
+                )
                 : [updatedShipment];
 
             const mergedOrderDetails = {
@@ -138,15 +146,13 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                 shipments: updatedShipmentsArray,
             };
 
-            // Update the store
             useOrderStore.setState({ orderDetails: mergedOrderDetails });
-
-            // Update local files state
             setFiles(allFiles);
             setIsDraftDisabled(true);
-
-            // Enable send button if courier email is present
-            setIsSendEnabled(!!shipmentData.courierEmail);
+            setIsSendEnabled(
+                !!shipmentData.courierEmail &&
+                (allFiles.length > 0 || !!shipmentData.orderDetails || !!shipmentData.referenceNumber)
+            );
 
             alert("Draft saved successfully!");
         } catch (error) {
@@ -158,8 +164,8 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
     };
 
     const getFileInfo = (file) => {
-        const fileName = file.name || file.url.split('/').pop();
-        const extension = fileName.split(".").pop().toLowerCase();
+        const fileName = typeof file.name === "string" ? file.name : (typeof file.url === "string" ? file.url.split('/').pop() : "");
+        const extension = fileName && fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "unknown";
         if (["pdf"].includes(extension)) return { icon: <FaFilePdf className="text-red-600" />, bg: "bg-red-100 text-red-700" };
         if (["jpg", "jpeg", "png"].includes(extension)) return { icon: <FaFileImage className="text-blue-600" />, bg: "bg-blue-100 text-blue-700" };
         return { icon: <FaFileAlt className="text-gray-600" />, bg: "bg-gray-100 text-gray-700" };
@@ -222,7 +228,7 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                     onChange={handleChange}
                     className="w-full mt-1 p-2 border border-gray-300 rounded-md"
                     rows="3"
-                ></textarea>
+                />
             </div>
 
             <div className="mb-4">
@@ -251,10 +257,18 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                         {files.map((file, index) => {
                             const { icon, bg } = getFileInfo(file);
                             return (
-                                <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                <div
+                                    key={index}
+                                    className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
+                                >
+                                    <a
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2"
+                                    >
                                         {icon}
-                                        <span className="truncate">{file.name}</span>
+                                        <span className="truncate">{file.name || "Uploaded File"}</span>
                                     </a>
                                     <button
                                         onClick={() => handleRemoveFile(index)}
@@ -274,14 +288,16 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"
+                        }`}
                     onClick={handleSaveDraft}
                     disabled={isDraftDisabled}
                 >
                     Save Draft
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"
+                        }`}
                     onClick={handleSendEmail}
                     disabled={!isSendEnabled}
                 >
@@ -292,5 +308,4 @@ function Shipment({ onSendClick }) { // Add onSendClick prop
     );
 }
 
-// Export with the HOC wrapper
-export default withEmailPreview(Shipment, 'shipment');
+export default withEmailPreview(Shipment, "shipment");

@@ -4,7 +4,7 @@ import { deleteFilesFromStorage, updateOrder, uploadFiles } from "../firebase/or
 import useOrderStore from "../store/orderStore";
 import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
 
-function OrderDetails({ onSendClick }) { // Add onSendClick prop
+function OrderDetails({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
     const [files, setFiles] = useState([]);
@@ -16,7 +16,7 @@ function OrderDetails({ onSendClick }) { // Add onSendClick prop
         orderDetails: "",
     });
     const [isChangesDisabled, setIsChangesDisabled] = useState(true);
-    const [canSendEmail, setCanSendEmail] = useState(false); // New state for send button
+    const [canSendEmail, setCanSendEmail] = useState(false);
 
     useEffect(() => {
         if (orderDetails) {
@@ -35,7 +35,7 @@ function OrderDetails({ onSendClick }) { // Add onSendClick prop
             })) || [];
             setFiles(uploadedFiles);
 
-            // Enable send button if we have data
+            // Enable send button if we have customer email
             setCanSendEmail(!!orderDetails.customerEmail);
         }
     }, [orderDetails]);
@@ -85,7 +85,7 @@ function OrderDetails({ onSendClick }) { // Add onSendClick prop
                 ...existingFiles,
                 ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
             ];
-            const updatedDetails = { ...details, files: allFiles };
+            const updatedDetails = { ...details, files: allFiles.map(file => ({ url: file.url, name: file.name })) };
 
             if (removedFiles.length > 0) {
                 await deleteFilesFromStorage(removedFiles);
@@ -107,21 +107,30 @@ function OrderDetails({ onSendClick }) { // Add onSendClick prop
 
             setFiles(allFiles);
             setIsChangesDisabled(true);
-            setCanSendEmail(true); // Enable send button after saving
+            setCanSendEmail(!!details.customerEmail); // Enable send button if we have customer email
         } catch (error) {
             console.error("Error during save:", error);
         }
     };
 
-    // Add function to handle Send Email button click
     const handleSendEmail = () => {
-        if (onSendClick) {
-            // Pass details and files to the email preview
-            onSendClick({
-                ...details,
-                files
-            });
+        if (!onSendClick || !orderDetails?.id) return;
+
+        // Make sure we have valid data
+        if (!details.customerEmail) {
+            alert("Customer email is required");
+            return;
         }
+
+        onSendClick({
+            to: details.customerEmail,
+            referenceNumber: details.referenceNumber,
+            orderName: details.orderName,
+            labelType: details.labelType,
+            orderDetails: details.orderDetails,
+            files: files,
+            orderId: orderDetails.id
+        });
     };
 
     const truncateFileName = (name, maxLength = 20) => {

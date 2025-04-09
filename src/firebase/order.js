@@ -1,6 +1,6 @@
 import { db } from "./firebaseConfig";
 import { collection, addDoc, Timestamp, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL ,deleteObject} from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 const storage = getStorage();
 export const uploadFiles = async (referenceNumber, section, files) => {
@@ -22,7 +22,7 @@ export const uploadFiles = async (referenceNumber, section, files) => {
             return { name: file.name, url: fileURL };
         });
 
-        return await Promise.all(uploadPromises); // Returns array of { name, url }
+        return await Promise.all(uploadPromises);
     } catch (error) {
         console.error("Error uploading files:", error);
         throw error;
@@ -61,7 +61,7 @@ export const getOrderWithDetails = async (orderId) => {
         const orderData = { id: orderId, ...orderSnap.data() };
 
         // Fetch related subcollections (emails, shipments, etc.)
-        const subcollections = ["sampling", "production", "shipments"];
+        const subcollections = ["sampling", "production", "shipments", "emailLog"];
         for (const subcollection of subcollections) {
             const subSnap = await getDocs(collection(db, "orders", orderId, subcollection));
             orderData[subcollection] = subSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));

@@ -3,9 +3,9 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addSamplingToOrder } from "../firebase/sampling.js";
-import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
+import { withEmailPreview } from "./withEmailPreview";
 
-function Sampling({ onSendClick }) { // Add onSendClick prop
+function Sampling({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [files, setFiles] = useState([]);
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
@@ -97,8 +97,8 @@ function Sampling({ onSendClick }) { // Add onSendClick prop
             const samplingData = {
                 vendorEmail: details.vendorEmail || "",
                 samplingInstructions: details.samplingInstructions || "",
-                files: allFiles,
-                updatedAt: new Date(), // Match Firestore's Timestamp.now()
+                files: allFiles.map(({ url, name }) => ({ url, name })),
+                updatedAt: new Date(),
             };
 
             // Save to Firestore and get the sampling document ID
@@ -150,15 +150,21 @@ function Sampling({ onSendClick }) { // Add onSendClick prop
         }
     };
 
-    // Add function to handle Send Email button click
     const handleSendEmail = () => {
-        if (onSendClick) {
-            // Pass details and files to the email preview
-            onSendClick({
-                ...details,
-                files
-            });
+        if (!onSendClick || !orderDetails?.id) return;
+
+        // Make sure we have valid data
+        if (!details.vendorEmail) {
+            alert("Vendor email is required");
+            return;
         }
+
+        onSendClick({
+            to: details.vendorEmail,
+            samplingInstructions: details.samplingInstructions,
+            files: files,
+            orderId: orderDetails.id
+        });
     };
 
     const getFileInfo = (file) => {
@@ -267,5 +273,4 @@ function Sampling({ onSendClick }) { // Add onSendClick prop
     );
 }
 
-// Export with the HOC wrapper
 export default withEmailPreview(Sampling, 'sampling');

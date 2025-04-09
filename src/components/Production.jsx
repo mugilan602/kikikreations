@@ -3,15 +3,15 @@ import { FaCloudUploadAlt, FaFilePdf, FaFileImage, FaFileAlt, FaTimes } from "re
 import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addProductionToOrder } from "../firebase/production.js";
-import { addShipmentToOrder } from "../firebase/shipment.js"; // Import shipment function
-import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
+import { addShipmentToOrder } from "../firebase/shipment.js";
+import { withEmailPreview } from "./withEmailPreview";
 
-function Production({ onSendClick }) { // Add onSendClick prop
+function Production({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
 
     const [files, setFiles] = useState([]);
-    const [isSaved, setIsSaved] = useState(true);
-    const [canSendToProduction, setCanSendToProduction] = useState(false); // New state for send button
+    const [isDraftDisabled, setIsDraftDisabled] = useState(true);
+    const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
 
     const [details, setDetails] = useState({
@@ -34,11 +34,13 @@ function Production({ onSendClick }) { // Add onSendClick prop
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
-
-            // Check if we can enable send button - vendor email must be present
-            setCanSendToProduction(!!firstProduction.vendorEmail && isSaved);
+            // Enable send button if vendorEmail exists and either notes or files are present
+            setIsSendEnabled(
+                !!firstProduction.vendorEmail &&
+                (uploadedFiles.length > 0 || !!firstProduction.notes || !!firstProduction.quantity)
+            );
         }
-    }, [orderDetails, isSaved]);
+    }, [orderDetails]);
 
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
@@ -47,7 +49,8 @@ function Production({ onSendClick }) { // Add onSendClick prop
             name: file.name,
         }));
         setFiles([...files, ...uploadedFiles]);
-        setIsSaved(false);
+        setIsDraftDisabled(false);
+        setIsSendEnabled(false);
     };
 
     const handleRemoveFile = (index) => {
@@ -57,7 +60,8 @@ function Production({ onSendClick }) { // Add onSendClick prop
         }
         const updatedFiles = files.filter((_, i) => i !== index);
         setFiles(updatedFiles);
-        setIsSaved(false);
+        setIsDraftDisabled(false);
+        setIsSendEnabled(false);
     };
 
     const handleChange = (e) => {
@@ -65,18 +69,26 @@ function Production({ onSendClick }) { // Add onSendClick prop
             ...details,
             [e.target.name]: e.target.value,
         });
-        setIsSaved(false);
+        setIsDraftDisabled(false);
+        setIsSendEnabled(false);
     };
 
-    // Add function to handle Send Email button click
     const handleSendEmail = () => {
-        if (onSendClick) {
-            // Pass details and files to the email preview
-            onSendClick({
-                ...details,
-                files
-            });
+        if (!onSendClick || !orderDetails?.id) return;
+
+        // Make sure we have valid data
+        if (!details.vendorEmail) {
+            alert("Vendor email is required");
+            return;
         }
+
+        onSendClick({
+            to: details.vendorEmail,
+            quantity: details.quantity,
+            notes: details.notes,
+            files: files,
+            orderId: orderDetails.id
+        });
     };
 
     const handleSaveDraft = async () => {
@@ -85,31 +97,37 @@ function Production({ onSendClick }) { // Add onSendClick prop
             return;
         }
 
-        setIsSaved(true);
+        setIsDraftDisabled(true);
+        setIsSendEnabled(false);
 
         try {
-            // Handle production files
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
             const existingFiles = files.filter(f => f.file === null);
-            let uploadedFiles = [];
+            let uploadedProductionFiles = [];
+            let uploadedShipmentFiles = [];
+
             if (newFiles.length > 0) {
-                uploadedFiles = await uploadFiles(orderDetails.referenceNumber, "production", newFiles);
+                uploadedProductionFiles = await uploadFiles(orderDetails.referenceNumber, "production", newFiles);
+                uploadedShipmentFiles = await uploadFiles(orderDetails.referenceNumber, "shipment", newFiles);
             }
 
             const allProductionFiles = [
                 ...existingFiles,
-                ...uploadedFiles.map(file => ({ file: null, url: file.url, name: file.name })),
+                ...uploadedProductionFiles.map(file => ({
+                    file: null,
+                    url: file.url,
+                    name: file.name,
+                })),
             ];
 
             const productionData = {
                 vendorEmail: details.vendorEmail || "",
                 quantity: details.quantity || "",
                 notes: details.notes || "",
-                files: allProductionFiles,
+                files: allProductionFiles.map(({ url, name }) => ({ url, name })),
                 updatedAt: new Date(),
             };
 
-            // Save production data and get the production document ID
             const productionId = await addProductionToOrder(orderDetails.id, productionData, allProductionFiles);
 
             if (removedFiles.length > 0) {
@@ -117,7 +135,6 @@ function Production({ onSendClick }) { // Add onSendClick prop
                 setRemovedFiles([]);
             }
 
-            // Construct updated production object
             const updatedProduction = {
                 ...productionData,
                 id: productionId,
@@ -128,18 +145,22 @@ function Production({ onSendClick }) { // Add onSendClick prop
 
             const updatedProductionArray = orderDetails.production?.length > 0
                 ? orderDetails.production.map((production, index) =>
-                    index === 0 ? updatedProduction : production)
+                    index === 0 ? updatedProduction : production
+                )
                 : [updatedProduction];
 
-            // Handle shipment update with production files
             const existingShipment = orderDetails.shipments?.length > 0 ? orderDetails.shipments[0] : null;
             const existingShipmentFiles = existingShipment?.files || [];
 
-            // Merge production files with existing shipment files, avoiding duplicates by URL
             const allShipmentFiles = [
                 ...existingShipmentFiles.filter(shipFile =>
-                    !allProductionFiles.some(prodFile => prodFile.url === shipFile.url)),
-                ...allProductionFiles,
+                    !uploadedShipmentFiles.some(newFile => newFile.name === shipFile.name)
+                ),
+                ...uploadedShipmentFiles.map(file => ({
+                    file: null,
+                    url: file.url,
+                    name: file.name,
+                })),
             ];
 
             const shipmentData = {
@@ -148,14 +169,12 @@ function Production({ onSendClick }) { // Add onSendClick prop
                 orderName: existingShipment?.orderName || orderDetails.orderName || "",
                 labelType: existingShipment?.labelType || orderDetails.labelType || "",
                 orderDetails: existingShipment?.orderDetails || "",
-                files: allShipmentFiles,
+                files: allShipmentFiles.map(({ url, name }) => ({ url, name })),
                 updatedAt: new Date(),
             };
 
-            // Save or update shipment data
             const shipmentId = await addShipmentToOrder(orderDetails.id, shipmentData, allShipmentFiles);
 
-            // Construct updated shipment object
             const updatedShipment = {
                 ...shipmentData,
                 id: shipmentId,
@@ -166,37 +185,35 @@ function Production({ onSendClick }) { // Add onSendClick prop
 
             const updatedShipmentsArray = orderDetails.shipments?.length > 0
                 ? orderDetails.shipments.map((shipment, index) =>
-                    index === 0 ? updatedShipment : shipment)
+                    index === 0 ? updatedShipment : shipment
+                )
                 : [updatedShipment];
 
-            // Merge both production and shipment updates into orderDetails
             const mergedOrderDetails = {
                 ...orderDetails,
                 production: updatedProductionArray,
                 shipments: updatedShipmentsArray,
             };
 
-            // Update the store
             useOrderStore.setState({ orderDetails: mergedOrderDetails });
-
-            // Update local files state (for production UI)
             setFiles(allProductionFiles);
-            setIsSaved(true);
-
-            // Update send button state
-            setCanSendToProduction(!!details.vendorEmail);
+            setIsDraftDisabled(true);
+            setIsSendEnabled(
+                !!details.vendorEmail &&
+                (allProductionFiles.length > 0 || !!details.notes || !!details.quantity)
+            );
 
             alert("Draft saved successfully! Production files added to shipments.");
         } catch (error) {
             alert("Failed to save draft. Please try again.");
-            setIsSaved(false);
+            setIsDraftDisabled(false);
             console.error("Error saving draft:", error);
         }
     };
 
     const getFileInfo = (file) => {
         const fileName = file.name || file.url.split('/').pop();
-        const extension = fileName.split(".").pop().toLowerCase();
+        const extension = fileName && fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "unknown";
 
         if (["pdf"].includes(extension)) {
             return { icon: <FaFilePdf className="text-red-600" />, bg: "bg-red-100 text-red-700" };
@@ -261,10 +278,18 @@ function Production({ onSendClick }) { // Add onSendClick prop
                     {files.map((file, index) => {
                         const { icon, bg } = getFileInfo(file);
                         return (
-                            <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                            <div
+                                key={index}
+                                className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
+                            >
+                                <a
+                                    href={file.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2"
+                                >
                                     {icon}
-                                    <span className="truncate">{file.name}</span>
+                                    <span className="truncate">{file.name || "Uploaded File"}</span>
                                 </a>
                                 <button
                                     onClick={() => handleRemoveFile(index)}
@@ -287,7 +312,7 @@ function Production({ onSendClick }) { // Add onSendClick prop
                     onChange={handleChange}
                     className="w-full mt-1 p-2 border border-gray-300 rounded-md"
                     rows="3"
-                ></textarea>
+                />
             </div>
 
             <div className="flex justify-end gap-3">
@@ -296,22 +321,23 @@ function Production({ onSendClick }) { // Add onSendClick prop
                 </button>
                 <button
                     onClick={handleSaveDraft}
-                    disabled={isSaved}
-                    className={`px-4 py-2 font-medium rounded-md ${isSaved ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"}`}
+                    disabled={isDraftDisabled}
+                    className={`px-4 py-2 font-medium rounded-md ${isDraftDisabled ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"
+                        }`}
                 >
                     Save Draft
                 </button>
                 <button
                     onClick={handleSendEmail}
-                    disabled={!canSendToProduction}
-                    className={`px-4 py-2 font-medium rounded-md ${canSendToProduction ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"}`}
+                    disabled={!isSendEnabled}
+                    className={`px-4 py-2 font-medium rounded-md ${isSendEnabled ? "bg-blue-600 text-white" : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                        }`}
                 >
-                    Send to production
+                    Send to Production
                 </button>
             </div>
         </div>
     );
 }
 
-// Export with the HOC wrapper
-export default withEmailPreview(Production, 'production');
+export default withEmailPreview(Production, "production");
