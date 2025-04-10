@@ -1,71 +1,82 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, Trash2 } from "lucide-react";
-import { useEffect } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
-import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { FaChevronRight } from "react-icons/fa6";
-import { getOrders, getOrderWithDetails } from "../firebase/order.js"
+import { getOrders, getOrderWithDetails } from "../firebase/order.js";
 import { motion } from "framer-motion";
-import OrderProgress from "../components/OrderProgess";
-import useOrderStore from "../store/orderStore.js"
+import useOrderStore from "../store/orderStore.js";
+import OrderProgress from "./OrderProgess.jsx";
 export default function OrderTable() {
     const statusStyles = {
         production: "bg-yellow-100 text-yellow-800",
         shipment: "bg-green-100 text-green-800",
-        sampling: "bg-blue-100 text-blue-800"
+        sampling: "bg-blue-100 text-blue-800",
+        "order-details": "bg-gray-100 text-gray-800",
     };
     const { orderDetails, setOrderDetails } = useOrderStore(); // Zustand state
 
     const [searchQuery, setSearchQuery] = useState("");
     const [openItem, setOpenItem] = useState(null);
-    // const [orderDetails, setOrderDetails] = useState(null);
     const [orders, setOrders] = useState([]);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
+    // Fetch orders on mount
     useEffect(() => {
         const fetchOrders = async () => {
             try {
                 const data = await getOrders();
                 setOrders(data);
-                console.log("Fetched Orders: ", data);
+                console.log("Initial Fetched Orders: ", data);
             } catch (error) {
                 console.log("Error fetching orders: ", error);
-
             }
         };
         fetchOrders();
     }, []);
+
     const handleOrderOpen = async (orderId) => {
-        setOpenItem(orderId); // Track which order is open
-        console.log("Order ID : ", orderId);
+        if (orderId === openItem) {
+            // Toggle close if clicking the same order
+            setOpenItem(null);
+            setOrderDetails(null);
+            return;
+        }
 
-        if (orderId) {
-            try {
-                // Clear previous order details when a new order is opened
-                setOrderDetails(null);
+        setOpenItem(orderId);
+        setIsLoadingDetails(true);
+        console.log("Opening Order ID: ", orderId);
 
-                // Fetch new order details
-                const details = await getOrderWithDetails(orderId);
-                console.log(details);
+        try {
+            setOrderDetails(null); // Clear previous details
+            const details = await getOrderWithDetails(orderId);
+            console.log("Fetched Order Details: ", details);
 
-                setOrderDetails(details); // Store only the latest order details
+            // Update Zustand store
+            setOrderDetails(details);
 
-                console.log("Fetched Order Details:", orderDetails);
-            } catch (error) {
-                console.error("Error fetching order details:", error);
-            }
+            // Update the orders array with the latest status
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    order.id === orderId ? { ...order, status: details.status } : order
+                )
+            );
+        } catch (error) {
+            console.error("Error fetching order details:", error);
+        } finally {
+            setIsLoadingDetails(false);
         }
     };
 
-
-    const filteredOrders = orders.filter(order =>
-        order.orderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.id.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredOrders = orders.filter(
+        (order) =>
+            order.orderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
         <div className="rounded-xl bg-white shadow-sm mb-4 mx-8">
             {/* Search Bar */}
-            <div className="flex rounded-xl flex-col bg-white  md:flex-row md:items-center gap-2 px-4 py-6 mb-4">
+            <div className="flex rounded-xl flex-col bg-white md:flex-row md:items-center gap-2 px-4 py-6 mb-4">
                 <div className="relative w-6/12">
                     <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
                     <input
@@ -90,77 +101,86 @@ export default function OrderTable() {
                     className="w-full min-w-[1000px]"
                     type="single"
                     collapsible
-                    onValueChange={(orderId) => { handleOrderOpen(orderId) }} // Track open item
+                    onValueChange={handleOrderOpen}
                 >
                     {/* Table Head */}
                     <div className="text-[#6B7280] bg-[#F9FAFB] text-sm border-b border-[#E5E7EB] flex font-medium">
-                        <div className="py-3 px-4 w-12"></div> {/* Icon Column */}
+                        <div className="py-3 px-4 w-12"></div>
                         <div className="py-3 px-4 flex-[2]">Reference</div>
                         <div className="py-3 px-4 flex-[3]">Order Name</div>
                         <div className="py-3 px-4 flex-[4]">Customer Email</div>
                         <div className="py-3 px-4 flex-[2] text-center">Status</div>
-                        <div className="py-3 px-4 w-18 text-center"></div> {/* Delete Icon Column */}
+                        <div className="py-3 px-4 w-18 text-center"></div>
                     </div>
 
                     {/* Table Body */}
-                    {filteredOrders.map((order, index) => (
-                        <Accordion.Item key={order.id} value={order.id} className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}>
-                            <Accordion.Header>
-                                <Accordion.Trigger asChild>
-                                    <div className="text-sm text-gray-700 flex items-center hover:bg-gray-50 cursor-pointer">
-                                        {/* Expand Icon with Framer Motion */}
-                                        <div className="py-4 px-4 w-12 flex items-center justify-center">
-                                            <motion.div
-                                                animate={{
-                                                    rotate: openItem === order.id ? 90 : 0,
-                                                }}
-                                                transition={{ duration: 0.2 }}
-                                            >
-                                                <FaChevronRight className="text-gray-500" />
-                                            </motion.div>
+                    {filteredOrders.map((order, index) => {
+                        // Use orderDetails.status if available and matching, otherwise use order.status
+                        const displayStatus =
+                            orderDetails && orderDetails.id === order.id && !isLoadingDetails
+                                ? orderDetails.status
+                                : order.status;
+
+                        return (
+                            <Accordion.Item
+                                key={order.id}
+                                value={order.id}
+                                className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}
+                            >
+                                <Accordion.Header>
+                                    <Accordion.Trigger asChild>
+                                        <div className="text-sm text-gray-700 flex items-center hover:bg-gray-50 cursor-pointer">
+                                            <div className="py-4 px-4 w-12 flex items-center justify-center">
+                                                <motion.div
+                                                    animate={{
+                                                        rotate: openItem === order.id ? 90 : 0,
+                                                    }}
+                                                    transition={{ duration: 0.2 }}
+                                                >
+                                                    <FaChevronRight className="text-gray-500" />
+                                                </motion.div>
+                                            </div>
+                                            <div className="py-4 px-4 flex-[2] text-black font-medium whitespace-nowrap">
+                                                {order.referenceNumber}
+                                            </div>
+                                            <div className="py-4 px-4 flex-[3] whitespace-nowrap">
+                                                {order.orderName}
+                                            </div>
+                                            <div className="py-4 px-4 flex-[4] whitespace-nowrap">
+                                                {order.customerEmail}
+                                            </div>
+                                            <div className="py-4 px-4 flex-[2] text-center">
+                                                <span
+                                                    className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"
+                                                        }`}
+                                                >
+                                                    {displayStatus}
+                                                </span>
+                                            </div>
+                                            <div className="py-4 px-4 w-18 text-center">
+                                                <button
+                                                    className="text-red-500 cursor-pointer hover:text-red-700"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        {/* Order Data */}
-                                        <div className="py-4 px-4 flex-[2] text-black font-medium whitespace-nowrap">
-                                            {order.referenceNumber}
-                                        </div>
-                                        <div className="py-4 px-4 flex-[3] whitespace-nowrap">
-                                            {order.orderName}
-                                        </div>
-                                        <div className="py-4 px-4 flex-[4] whitespace-nowrap">
-                                            {order.customerEmail}
-                                        </div>
-                                        <div className="py-4 px-4 flex-[2] text-center">
-                                            <span
-                                                className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[order.status]}`}
-                                            >
-                                                {order.status}
-                                            </span>
-                                        </div>
-                                        {/* Delete Button */}
-                                        <div className="py-4 px-4 w-18 text-center">
-                                            <button
-                                                className="text-red-500 cursor-pointer hover:text-red-700"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
+                                    </Accordion.Trigger>
+                                </Accordion.Header>
+
+                                <Accordion.Content>
+                                    <div className="p-4 border-t border-[#E5E7EB]">
+                                        {orderDetails && orderDetails.id === order.id && !isLoadingDetails ? (
+                                            <OrderProgress />
+                                        ) : (
+                                            <p className="text-gray-500">Loading order details...</p>
+                                        )}
                                     </div>
-                                </Accordion.Trigger>
-                            </Accordion.Header>
-
-
-                            <Accordion.Content className="">
-                                <div className="p-4 border-t border-[#E5E7EB]">
-                                    {orderDetails ? (
-                                        <OrderProgress />
-                                    ) : (
-                                        <p className="text-gray-500">Loading order details...</p>
-                                    )}
-                                </div>
-                            </Accordion.Content>
-                        </Accordion.Item>
-                    ))}
+                                </Accordion.Content>
+                            </Accordion.Item>
+                        );
+                    })}
                 </Accordion.Root>
             </div>
         </div>

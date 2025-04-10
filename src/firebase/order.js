@@ -33,6 +33,7 @@ export const createOrder = async (orderData) => {
     try {
         const newOrder = await addDoc(collection(db, "orders"), {
             ...orderData,
+            status: "",
             createdAt: Timestamp.now(),
         });
         return newOrder.id;
