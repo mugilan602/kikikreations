@@ -363,13 +363,13 @@ function SentMails({ onSendClick }) {
                                         >
                                             <Eye size={18} />
                                         </button>
-                                        <button
+                                        {/* <button
                                             className="text-gray-500 hover:text-gray-700"
                                             onClick={() => handleForwardEmail(mail)}
                                             title="Forward Email"
                                         >
                                             <RiShareForwardFill size={18} />
-                                        </button>
+                                        </button> */}
                                         <button
                                             className="text-gray-500 hover:text-gray-700"
                                             onClick={() => handleResendEmail(mail)}
