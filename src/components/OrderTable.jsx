@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Search, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Search, Trash2, Filter } from "lucide-react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { FaChevronRight } from "react-icons/fa6";
 import { getOrders, getOrderWithDetails, deleteOrder } from "../firebase/order.js";
@@ -31,10 +31,32 @@ export default function OrderTable() {
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [loadingTimestamp, setLoadingTimestamp] = useState(null);
 
+    // Filters
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [labelFilter, setLabelFilter] = useState("all");
+
     // Delete confirmation state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Get unique label types and statuses for filter dropdowns
+    const uniqueLabelTypes = useMemo(() => {
+        const labelTypes = new Set();
+        orders.forEach(order => {
+            if (order.labelType) labelTypes.add(order.labelType);
+        });
+        return Array.from(labelTypes).sort();
+    }, [orders]);
+
+    const uniqueStatuses = useMemo(() => {
+        const statuses = new Set();
+        orders.forEach(order => {
+            const status = order.status || "order-details";
+            statuses.add(status);
+        });
+        return Array.from(statuses).sort();
+    }, [orders]);
 
     // Fetch orders on mount and store them in Zustand
     useEffect(() => {
@@ -146,16 +168,39 @@ export default function OrderTable() {
         }
     };
 
-    const filteredOrders = orders.filter(
-        (order) =>
-        (order.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.referenceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.id?.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // Filter orders based on search query, status, and label
+    const filteredOrders = useMemo(() => {
+        return orders.filter((order) => {
+            // Search filter
+            const matchesSearch =
+                (order.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    order.referenceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    order.id?.toLowerCase().includes(searchQuery.toLowerCase()));
+
+            // Status filter
+            const orderStatus = order.status || "order-details";
+            const matchesStatus = statusFilter === "all" || orderStatus === statusFilter;
+
+            // Label filter
+            const matchesLabel = labelFilter === "all" || order.labelType === labelFilter;
+
+            return matchesSearch && matchesStatus && matchesLabel;
+        });
+    }, [orders, searchQuery, statusFilter, labelFilter]);
+
+    // Reset all filters
+    const resetFilters = () => {
+        setSearchQuery("");
+        setStatusFilter("all");
+        setLabelFilter("all");
+    };
+
+    // Check if any filters are active
+    const isFiltered = searchQuery !== "" || statusFilter !== "all" || labelFilter !== "all";
 
     return (
         <div className="rounded-xl bg-white shadow-sm mb-4 mx-8">
-            {/* Search Bar */}
+            {/* Search Bar and Filters */}
             <div className="flex rounded-xl flex-col bg-white md:flex-row md:items-center gap-2 px-4 py-6 mb-4">
                 <div className="relative w-6/12">
                     <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
@@ -167,13 +212,60 @@ export default function OrderTable() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <select className="border border-[#E5E7EB] px-3 py-2 rounded w-3/12">
-                    <option>All Status</option>
-                </select>
-                <select className="border border-[#E5E7EB] px-3 py-2 rounded w-3/12">
-                    <option>All Label Types</option>
-                </select>
+
+                {/* Status Filter */}
+                <div className="relative w-3/12">
+                    <select
+                        className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        <option value="all">All Statuses</option>
+                        {uniqueStatuses.map((status) => (
+                            <option key={status} value={status}>
+                                {status === "order-details" ? "New Order" : status.charAt(0).toUpperCase() + status.slice(1)}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Label Filter */}
+                <div className="relative w-3/12">
+                    <select
+                        className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
+                        value={labelFilter}
+                        onChange={(e) => setLabelFilter(e.target.value)}
+                    >
+                        <option value="all">All Label Types</option>
+                        {uniqueLabelTypes.map((label) => (
+                            <option key={label} value={label}>
+                                {label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
+
+            {/* Active Filters Indicator */}
+            {isFiltered && (
+                <div className="flex items-center justify-between px-4 pb-4 -mt-2">
+                    <div className="flex items-center text-sm text-gray-600">
+                        <Filter size={16} className="mr-1" />
+                        <span>
+                            Filters:
+                            {searchQuery && <span className="ml-1">Search</span>}
+                            {statusFilter !== "all" && <span className="ml-1">• Status</span>}
+                            {labelFilter !== "all" && <span className="ml-1">• Label</span>}
+                        </span>
+                    </div>
+                    <button
+                        onClick={resetFilters}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                        Reset filters
+                    </button>
+                </div>
+            )}
 
             {/* Scrollable Table Wrapper for Mobile */}
             <div className="overflow-x-auto">
@@ -235,7 +327,7 @@ export default function OrderTable() {
                                                     <span
                                                         className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"}`}
                                                     >
-                                                        {displayStatus === "order-details" ? "New Order" : displayStatus}
+                                                        {displayStatus === "order-details" ? "New Order" : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
                                                     </span>
                                                 </div>
                                                 <div className="py-4 px-4 w-18 text-center">
@@ -268,8 +360,8 @@ export default function OrderTable() {
                         })
                     ) : (
                         <div className="py-8 text-center text-gray-500 w-full">
-                            {searchQuery ? (
-                                <>No orders match your search criteria.</>
+                            {isFiltered ? (
+                                <>No orders match your filter criteria. <button onClick={resetFilters} className="text-blue-600 hover:underline">Reset filters</button></>
                             ) : (
                                 <>No orders found. Add your first order to get started.</>
                             )}
