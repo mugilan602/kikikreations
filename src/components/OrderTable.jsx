@@ -41,22 +41,37 @@ export default function OrderTable() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Get unique label types and statuses for filter dropdowns
+    // Add a unique key to force recalculation when needed
+    const [filterUpdateKey, setFilterUpdateKey] = useState(0);
+
+    // Force refresh of filters
+    const refreshFilters = () => {
+        setFilterUpdateKey(prevKey => prevKey + 1);
+    };
+
     const uniqueLabelTypes = useMemo(() => {
+        console.log("Recalculating label types");
         const labelTypes = new Set();
         orders.forEach(order => {
             if (order.labelType) labelTypes.add(order.labelType);
         });
         return Array.from(labelTypes).sort();
-    }, [orders]);
+    }, [orders, filterUpdateKey]);
 
     const uniqueStatuses = useMemo(() => {
+        console.log("Recalculating statuses");
         const statuses = new Set();
         orders.forEach(order => {
             const status = order.status || "order-details";
             statuses.add(status);
         });
         return Array.from(statuses).sort();
-    }, [orders]);
+    }, [orders, filterUpdateKey]);
+
+    // Force refresh of filters when selecting a dropdown
+    const handleFilterClick = () => {
+        refreshFilters();
+    };
 
     // Fetch orders on mount and store them in Zustand
     useEffect(() => {
@@ -83,6 +98,18 @@ export default function OrderTable() {
             fetchOrders();
         }
     }, [setOrders, orders.length, showToast]);
+
+    // Listen for changes to orderDetails and update filters when status changes
+    useEffect(() => {
+        if (orderDetails) {
+            refreshFilters();
+        }
+    }, [orderDetails?.status]);
+
+    // Listen for any changes in the orders array length (additions or deletions)
+    useEffect(() => {
+        refreshFilters();
+    }, [orders.length]);
 
     const handleOrderOpen = async (orderId) => {
         // When closing (orderId is null or empty), just clean up
@@ -219,6 +246,8 @@ export default function OrderTable() {
                         className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
+                        onClick={handleFilterClick}
+                        onFocus={handleFilterClick}
                     >
                         <option value="all">All Statuses</option>
                         {uniqueStatuses.map((status) => (
@@ -235,6 +264,8 @@ export default function OrderTable() {
                         className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
                         value={labelFilter}
                         onChange={(e) => setLabelFilter(e.target.value)}
+                        onClick={handleFilterClick}
+                        onFocus={handleFilterClick}
                     >
                         <option value="all">All Label Types</option>
                         {uniqueLabelTypes.map((label) => (
