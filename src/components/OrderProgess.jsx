@@ -12,12 +12,6 @@ export default function OrderProgress() {
     const [activeTab, setActiveTab] = useState("order-details");
     const orderDetails = useOrderStore((state) => state.orderDetails);
 
-    useEffect(() => {
-        if (orderDetails?.status) {
-            setActiveTab(orderDetails.status);
-        }
-    }, [orderDetails?.status]);
-
     const steps = [
         { id: "sampling", label: "Sampling", icon: <TestTubeDiagonal />, isLucide: true },
         {

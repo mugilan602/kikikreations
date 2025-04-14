@@ -270,13 +270,13 @@ function OrderDetails({ onSendClick }) {
                 >
                     Save Changes
                 </button>
-                <button
+                {/* <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${canSendEmail ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
                     onClick={handleSendEmail}
                     disabled={!canSendEmail}
                 >
                     Send to Customer
-                </button>
+                </button> */}
             </div>
         </div>
     );

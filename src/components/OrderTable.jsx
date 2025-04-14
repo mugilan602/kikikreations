@@ -19,6 +19,7 @@ export default function OrderTable() {
     const [openItem, setOpenItem] = useState(null);
     const [orders, setOrders] = useState([]);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [loadingTimestamp, setLoadingTimestamp] = useState(null);
 
     // Fetch orders on mount
     useEffect(() => {
@@ -34,6 +35,26 @@ export default function OrderTable() {
         fetchOrders();
     }, []);
 
+    // Listen for changes to orderDetails in the Zustand store
+    useEffect(() => {
+        if (orderDetails && orders.length > 0) {
+            // Update the orders array with the latest status from the store
+            setOrders((prevOrders) =>
+                prevOrders.map((order) =>
+                    order.id === orderDetails.id
+                        ? {
+                            ...order,
+                            status: orderDetails.status,
+                            customerEmail: orderDetails.customerEmail,
+                            orderName: orderDetails.orderName,
+                            referenceNumber: orderDetails.referenceNumber
+                        }
+                        : order
+                )
+            );
+        }
+    }, [orderDetails]);
+
     const handleOrderOpen = async (orderId) => {
         if (orderId === openItem) {
             // Toggle close if clicking the same order
@@ -44,22 +65,27 @@ export default function OrderTable() {
 
         setOpenItem(orderId);
         setIsLoadingDetails(true);
+        setLoadingTimestamp(Date.now());
         console.log("Opening Order ID: ", orderId);
 
         try {
-            setOrderDetails(null); // Clear previous details
-            const details = await getOrderWithDetails(orderId);
-            console.log("Fetched Order Details: ", details);
+            // Check if we have the order details in the Zustand store and it's the one we're opening
+            const hasDetailsInStore = orderDetails && orderDetails.id === orderId;
 
-            // Update Zustand store
-            setOrderDetails(details);
+            if (!hasDetailsInStore) {
+                // Only clear previous details if we're loading a different order
+                setOrderDetails(null);
 
-            // Update the orders array with the latest status
-            setOrders((prevOrders) =>
-                prevOrders.map((order) =>
-                    order.id === orderId ? { ...order, status: details.status } : order
-                )
-            );
+                // Fetch fresh details from the database
+                const details = await getOrderWithDetails(orderId);
+                console.log("Fetched Order Details: ", details);
+
+                // Update Zustand store with fresh data
+                setOrderDetails(details);
+            } else {
+                console.log("Using order details from Zustand store");
+                // We already have the details in the store, no need to fetch again
+            }
         } catch (error) {
             console.error("Error fetching order details:", error);
         } finally {
@@ -69,7 +95,7 @@ export default function OrderTable() {
 
     const filteredOrders = orders.filter(
         (order) =>
-            order.orderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             order.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -115,9 +141,9 @@ export default function OrderTable() {
 
                     {/* Table Body */}
                     {filteredOrders.map((order, index) => {
-                        // Use orderDetails.status if available and matching, otherwise use order.status
+                        // Always prefer the status from orderDetails if it's the currently open order
                         const displayStatus =
-                            orderDetails && orderDetails.id === order.id && !isLoadingDetails
+                            orderDetails && orderDetails.id === order.id
                                 ? orderDetails.status
                                 : order.status;
 
