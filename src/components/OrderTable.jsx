@@ -2,10 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Search, Trash2 } from "lucide-react";
 import * as Accordion from "@radix-ui/react-accordion";
 import { FaChevronRight } from "react-icons/fa6";
-import { getOrders, getOrderWithDetails } from "../firebase/order.js";
+import { getOrders, getOrderWithDetails, deleteOrder } from "../firebase/order.js";
 import { motion } from "framer-motion";
 import useOrderStore from "../store/orderStore.js";
 import OrderProgress from "./OrderProgess.jsx";
+import DeleteConfirmationModal from "./DeleteConfirmationModal.jsx";
+import { useToast } from "./ToastContext.jsx";
+
 export default function OrderTable() {
     const statusStyles = {
         production: "bg-yellow-100 text-yellow-800",
@@ -13,53 +16,64 @@ export default function OrderTable() {
         sampling: "bg-blue-100 text-blue-800",
         "order-details": "bg-gray-100 text-gray-800",
     };
-    const { orderDetails, setOrderDetails } = useOrderStore(); // Zustand state
+
+    // Get all necessary data and functions from the Zustand store
+    const orderDetails = useOrderStore((state) => state.orderDetails);
+    const setOrderDetails = useOrderStore((state) => state.setOrderDetails);
+    const orders = useOrderStore((state) => state.orders);
+    const setOrders = useOrderStore((state) => state.setOrders);
+    const removeOrder = useOrderStore((state) => state.removeOrder);
+
+    const { showToast } = useToast(); // Use the toast context
 
     const [searchQuery, setSearchQuery] = useState("");
     const [openItem, setOpenItem] = useState(null);
-    const [orders, setOrders] = useState([]);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [loadingTimestamp, setLoadingTimestamp] = useState(null);
 
-    // Fetch orders on mount
+    // Delete confirmation state
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Fetch orders on mount and store them in Zustand
     useEffect(() => {
         const fetchOrders = async () => {
             try {
                 const data = await getOrders();
-                setOrders(data);
-                console.log("Initial Fetched Orders: ", data);
+                // Sort orders by createdAt date (newest first)
+                const sortedOrders = data.sort((a, b) => {
+                    const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+                    const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+                    return dateB - dateA;
+                });
+
+                setOrders(sortedOrders); // Update orders in Zustand store
+                console.log("Initial Fetched Orders: ", sortedOrders);
             } catch (error) {
-                console.log("Error fetching orders: ", error);
+                console.error("Error fetching orders: ", error);
+                showToast(`Error fetching orders: ${error.message}`, "error");
             }
         };
-        fetchOrders();
-    }, []);
 
-    // Listen for changes to orderDetails in the Zustand store
-    useEffect(() => {
-        if (orderDetails && orders.length > 0) {
-            // Update the orders array with the latest status from the store
-            setOrders((prevOrders) =>
-                prevOrders.map((order) =>
-                    order.id === orderDetails.id
-                        ? {
-                            ...order,
-                            status: orderDetails.status,
-                            customerEmail: orderDetails.customerEmail,
-                            orderName: orderDetails.orderName,
-                            referenceNumber: orderDetails.referenceNumber
-                        }
-                        : order
-                )
-            );
+        // Only fetch if orders array is empty
+        if (orders.length === 0) {
+            fetchOrders();
         }
-    }, [orderDetails]);
+    }, [setOrders, orders.length, showToast]);
 
     const handleOrderOpen = async (orderId) => {
-        if (orderId === openItem) {
-            // Toggle close if clicking the same order
+        // When closing (orderId is null or empty), just clean up
+        if (!orderId) {
             setOpenItem(null);
-            setOrderDetails(null);
+            // Don't clear orderDetails to avoid flickering if user reopens the same order
+            return;
+        }
+
+        // If closing the currently open item
+        if (orderId === openItem) {
+            setOpenItem(null);
+            // Don't clear orderDetails to avoid flickering if user reopens the same order
             return;
         }
 
@@ -74,7 +88,7 @@ export default function OrderTable() {
 
             if (!hasDetailsInStore) {
                 // Only clear previous details if we're loading a different order
-                setOrderDetails(null);
+                // setOrderDetails(null); // Commented out to avoid flickering
 
                 // Fetch fresh details from the database
                 const details = await getOrderWithDetails(orderId);
@@ -88,15 +102,55 @@ export default function OrderTable() {
             }
         } catch (error) {
             console.error("Error fetching order details:", error);
+            showToast(`Error fetching order details: ${error.message}`, "error");
         } finally {
             setIsLoadingDetails(false);
         }
     };
 
+    // Handle opening the delete confirmation modal
+    const handleDeleteClick = (e, order) => {
+        e.stopPropagation(); // Prevent the accordion from toggling
+        setOrderToDelete(order);
+        setIsDeleteModalOpen(true);
+    };
+
+    // Handle the actual deletion
+    const handleConfirmDelete = async () => {
+        if (!orderToDelete) return;
+
+        setIsDeleting(true);
+        try {
+            // Delete the order from Firestore
+            await deleteOrder(orderToDelete.id);
+
+            // Update the Zustand store by removing the deleted order
+            removeOrder(orderToDelete.id);
+
+            // If the deleted order was open, close it
+            if (openItem === orderToDelete.id) {
+                setOpenItem(null);
+            }
+
+            // Show success toast
+            showToast(`Order ${orderToDelete.referenceNumber || orderToDelete.id} deleted successfully`, "success");
+
+            // Close the modal
+            setIsDeleteModalOpen(false);
+            setOrderToDelete(null);
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            showToast(`Failed to delete order: ${error.message}`, "error");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     const filteredOrders = orders.filter(
         (order) =>
-            order.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            order.id.toLowerCase().includes(searchQuery.toLowerCase())
+        (order.orderName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.referenceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            order.id?.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
@@ -128,6 +182,7 @@ export default function OrderTable() {
                     type="single"
                     collapsible
                     onValueChange={handleOrderOpen}
+                    value={openItem}
                 >
                     {/* Table Head */}
                     <div className="text-[#6B7280] bg-[#F9FAFB] text-sm border-b border-[#E5E7EB] flex font-medium">
@@ -136,79 +191,101 @@ export default function OrderTable() {
                         <div className="py-3 px-4 flex-[3]">Order Name</div>
                         <div className="py-3 px-4 flex-[4]">Customer Email</div>
                         <div className="py-3 px-4 flex-[2] text-center">Status</div>
-                        <div className="py-3 px-4 w-18 text-center"></div>
+                        <div className="py-3 px-4 w-18 text-center">Actions</div>
                     </div>
 
                     {/* Table Body */}
-                    {filteredOrders.map((order, index) => {
-                        // Always prefer the status from orderDetails if it's the currently open order
-                        const displayStatus =
-                            orderDetails && orderDetails.id === order.id
-                                ? orderDetails.status
-                                : order.status;
+                    {filteredOrders.length > 0 ? (
+                        filteredOrders.map((order, index) => {
+                            // Always prefer the status from orderDetails if it's the currently open order
+                            const displayStatus =
+                                orderDetails && orderDetails.id === order.id
+                                    ? orderDetails.status
+                                    : order.status || "order-details"; // Default status
 
-                        return (
-                            <Accordion.Item
-                                key={order.id}
-                                value={order.id}
-                                className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}
-                            >
-                                <Accordion.Header>
-                                    <Accordion.Trigger asChild>
-                                        <div className="text-sm text-gray-700 flex items-center hover:bg-gray-50 cursor-pointer">
-                                            <div className="py-4 px-4 w-12 flex items-center justify-center">
-                                                <motion.div
-                                                    animate={{
-                                                        rotate: openItem === order.id ? 90 : 0,
-                                                    }}
-                                                    transition={{ duration: 0.2 }}
-                                                >
-                                                    <FaChevronRight className="text-gray-500" />
-                                                </motion.div>
+                            return (
+                                <Accordion.Item
+                                    key={order.id}
+                                    value={order.id}
+                                    className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}
+                                >
+                                    <Accordion.Header>
+                                        <Accordion.Trigger asChild>
+                                            <div className="text-sm text-gray-700 flex items-center hover:bg-gray-50 cursor-pointer">
+                                                <div className="py-4 px-4 w-12 flex items-center justify-center">
+                                                    <motion.div
+                                                        animate={{
+                                                            rotate: openItem === order.id ? 90 : 0,
+                                                        }}
+                                                        transition={{ duration: 0.2 }}
+                                                    >
+                                                        <FaChevronRight className="text-gray-500" />
+                                                    </motion.div>
+                                                </div>
+                                                <div className="py-4 px-4 flex-[2] text-black font-medium whitespace-nowrap">
+                                                    {order.referenceNumber || "N/A"}
+                                                </div>
+                                                <div className="py-4 px-4 flex-[3] whitespace-nowrap">
+                                                    {order.orderName || "Unnamed Order"}
+                                                </div>
+                                                <div className="py-4 px-4 flex-[4] whitespace-nowrap">
+                                                    {order.customerEmail || "No email"}
+                                                </div>
+                                                <div className="py-4 px-4 flex-[2] text-center">
+                                                    <span
+                                                        className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"}`}
+                                                    >
+                                                        {displayStatus === "order-details" ? "New Order" : displayStatus}
+                                                    </span>
+                                                </div>
+                                                <div className="py-4 px-4 w-18 text-center">
+                                                    <button
+                                                        className="text-red-500 cursor-pointer hover:text-red-700"
+                                                        onClick={(e) => handleDeleteClick(e, order)}
+                                                        aria-label="Delete order"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="py-4 px-4 flex-[2] text-black font-medium whitespace-nowrap">
-                                                {order.referenceNumber}
-                                            </div>
-                                            <div className="py-4 px-4 flex-[3] whitespace-nowrap">
-                                                {order.orderName}
-                                            </div>
-                                            <div className="py-4 px-4 flex-[4] whitespace-nowrap">
-                                                {order.customerEmail}
-                                            </div>
-                                            <div className="py-4 px-4 flex-[2] text-center">
-                                                <span
-                                                    className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"
-                                                        }`}
-                                                >
-                                                    {displayStatus}
-                                                </span>
-                                            </div>
-                                            <div className="py-4 px-4 w-18 text-center">
-                                                <button
-                                                    className="text-red-500 cursor-pointer hover:text-red-700"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
+                                        </Accordion.Trigger>
+                                    </Accordion.Header>
+
+                                    <Accordion.Content>
+                                        <div className="p-4 border-t border-[#E5E7EB]">
+                                            {orderDetails && orderDetails.id === order.id && !isLoadingDetails ? (
+                                                <OrderProgress />
+                                            ) : (
+                                                <div className="py-4 text-center text-gray-500">
+                                                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                    Loading order details...
+                                                </div>
+                                            )}
                                         </div>
-                                    </Accordion.Trigger>
-                                </Accordion.Header>
-
-                                <Accordion.Content>
-                                    <div className="p-4 border-t border-[#E5E7EB]">
-                                        {orderDetails && orderDetails.id === order.id && !isLoadingDetails ? (
-                                            <OrderProgress />
-                                        ) : (
-                                            <p className="text-gray-500">Loading order details...</p>
-                                        )}
-                                    </div>
-                                </Accordion.Content>
-                            </Accordion.Item>
-                        );
-                    })}
+                                    </Accordion.Content>
+                                </Accordion.Item>
+                            );
+                        })
+                    ) : (
+                        <div className="py-8 text-center text-gray-500 w-full">
+                            {searchQuery ? (
+                                <>No orders match your search criteria.</>
+                            ) : (
+                                <>No orders found. Add your first order to get started.</>
+                            )}
+                        </div>
+                    )}
                 </Accordion.Root>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Order"
+                message={`Are you sure you want to delete order ${orderToDelete?.referenceNumber || ''}? This action cannot be undone.`}
+            />
         </div>
     );
 }

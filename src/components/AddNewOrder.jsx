@@ -1,6 +1,9 @@
 import React, { useState, useRef } from "react";
 import { Inbox, Mail, Tag } from "lucide-react";
-import { createOrder ,uploadFiles} from "../firebase/order.js";
+import { createOrder, uploadFiles } from "../firebase/order.js";
+import useOrderStore from "../store/orderStore"; // Import the store
+import { useToast } from "./ToastContext"; // Import the toast context
+
 export default function AddNewOrder({ setOpen }) {
     const [customerEmail, setEmail] = useState("");
     const [orderName, setOrderName] = useState("");
@@ -8,8 +11,13 @@ export default function AddNewOrder({ setOpen }) {
     const [orderDetails, setOrderDetails] = useState("");
     const [referenceNumber, setReferenceNumber] = useState("");
     const [files, setFiles] = useState([]);
+    const { showToast } = useToast(); // Use the toast context
 
-    const fileInputRef = useRef(null); 
+    // Get orders setter from the store to update UI
+    const setOrders = useOrderStore((state) => state.setOrders);
+    const orders = useOrderStore((state) => state.orders);
+
+    const fileInputRef = useRef(null);
 
     const handleFileUpload = (event) => {
         const selectedFiles = Array.from(event.target.files);
@@ -17,12 +25,14 @@ export default function AddNewOrder({ setOpen }) {
     };
 
     const handleUploadClick = () => {
-        fileInputRef.current.click(); 
+        fileInputRef.current.click();
     };
+
     const handleSubmit = async () => {
         try {
             if (!referenceNumber || files.length === 0) {
                 console.error("Reference number and files are required!");
+                showToast("Reference number and files are required!", "error");
                 return;
             }
 
@@ -41,16 +51,31 @@ export default function AddNewOrder({ setOpen }) {
                 labelType,
                 orderDetails,
                 files: uploadedFiles, // Store uploaded files with URLs
+                status: "order-details", // Set initial status explicitly
+                createdAt: new Date(), // Add createdAt field explicitly
             };
 
             console.log("Order Data JSON:", JSON.stringify(orderData, null, 2));
 
             // Create order in Firestore
-            const response = await createOrder(orderData);
-            console.log("Order Created Successfully:", response);
+            const orderId = await createOrder(orderData);
+            console.log("Order Created Successfully:", orderId);
+
+            // Add the new order to the local state with the ID from Firestore
+            const newOrder = {
+                id: orderId,
+                ...orderData,
+            };
+
+            // Update the orders array in the store - add to beginning of array
+            setOrders([newOrder, ...orders]);
+
+            // Show success toast
+            showToast(`Order ${referenceNumber} created successfully`, "success");
 
         } catch (error) {
             console.error("Error in handleSubmit:", error);
+            showToast(`Failed to create order: ${error.message}`, "error");
         }
 
         setOpen(false);
@@ -102,19 +127,16 @@ export default function AddNewOrder({ setOpen }) {
                 </div>
             </div>
 
-            {/* Kind of Label (Dropdown) */}
+            {/* Kind of Label (Text Input instead of Dropdown) */}
             <div className="mb-3">
                 <label className="text-sm font-medium text-gray-700">Kind of Label</label>
-                <select
+                <input
+                    type="text"
                     className="border px-3 py-2 rounded w-full focus:ring-2 focus:ring-gray-300"
+                    placeholder="e.g. Woven, Printed, Care, etc."
                     value={labelType}
                     onChange={(e) => setLabelType(e.target.value)}
-                >
-                    <option value="">Select a label type</option>
-                    <option value="woven">Woven Labels</option>
-                    <option value="printed">Printed Labels</option>
-                    <option value="care">Care Labels</option>
-                </select>
+                />
             </div>
 
             {/* Order Details */}

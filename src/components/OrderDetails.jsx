@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { FaFilePdf, FaFileImage, FaTimes, FaCloudUploadAlt } from "react-icons/fa";
-import { deleteFilesFromStorage, updateOrder, uploadFiles } from "../firebase/order";
+import { deleteFilesFromStorage, updateOrder, uploadFiles, deleteOrder } from "../firebase/order";
 import useOrderStore from "../store/orderStore";
 import { withEmailPreview } from "./withEmailPreview"; // Import the HOC
+import DeleteConfirmationModal from "./DeleteConfirmationModal"; // Import the modal
+import { useToast } from "./ToastContext"; // Import the toast context
 
 function OrderDetails({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
+    const setOrderDetails = useOrderStore((state) => state.setOrderDetails);
+    const orders = useOrderStore((state) => state.orders); // Get orders array
+    const setOrders = useOrderStore((state) => state.setOrders); // Get setter for orders
+    const { showToast } = useToast(); // Use the toast context
+
     const [removedFiles, setRemovedFiles] = useState([]);
     const [files, setFiles] = useState([]);
     const [details, setDetails] = useState({
@@ -17,6 +24,10 @@ function OrderDetails({ onSendClick }) {
     });
     const [isChangesDisabled, setIsChangesDisabled] = useState(true);
     const [canSendEmail, setCanSendEmail] = useState(false);
+
+    // Delete confirmation state
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (orderDetails) {
@@ -37,8 +48,23 @@ function OrderDetails({ onSendClick }) {
 
             // Enable send button if we have customer email
             setCanSendEmail(!!orderDetails.customerEmail);
+
+            // Ensure the status is set if not already present
+            if (!orderDetails.status) {
+                const updatedOrderDetails = {
+                    ...orderDetails,
+                    status: "order-details" // Default status for new orders
+                };
+
+                // Update both orderDetails and the orders array
+                setOrderDetails(updatedOrderDetails);
+
+                // Also update the status in Firestore if it doesn't exist
+                updateOrder(orderDetails.id, { status: "order-details" })
+                    .catch(error => console.error("Error updating order status:", error));
+            }
         }
-    }, [orderDetails]);
+    }, [orderDetails, setOrderDetails]);
 
     const handleFileUpload = (event) => {
         const uploadedFiles = Array.from(event.target.files).map(file => ({
@@ -105,11 +131,60 @@ function OrderDetails({ onSendClick }) {
             // Update the store with the merged object
             useOrderStore.setState({ orderDetails: mergedOrderDetails });
 
+            // Update the order in the orders array
+            const updatedOrders = orders.map(order =>
+                order.id === orderDetails.id
+                    ? {
+                        ...order,
+                        ...updatedDetails,
+                        id: orderDetails.id,
+                    }
+                    : order
+            );
+            setOrders(updatedOrders);
+
             setFiles(allFiles);
             setIsChangesDisabled(true);
             setCanSendEmail(!!details.customerEmail); // Enable send button if we have customer email
+
+            // Show success toast
+            showToast("Changes saved successfully", "success");
         } catch (error) {
             console.error("Error during save:", error);
+            showToast(`Failed to save changes: ${error.message}`, "error");
+        }
+    };
+
+    const handleDeleteClick = () => {
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!orderDetails?.id) return;
+
+        setIsDeleting(true);
+        try {
+            // Delete the order from Firestore
+            await deleteOrder(orderDetails.id);
+
+            // Remove the order from the local orders array
+            const updatedOrders = orders.filter(order => order.id !== orderDetails.id);
+            setOrders(updatedOrders);
+
+            // Clear the order details from the store
+            setOrderDetails(null);
+
+            // Show success toast
+            showToast(`Order ${orderDetails.referenceNumber || orderDetails.id} deleted successfully`, "success");
+
+            // Close the modal
+            setIsDeleteModalOpen(false);
+
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            showToast(`Failed to delete order: ${error.message}`, "error");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -260,24 +335,30 @@ function OrderDetails({ onSendClick }) {
             </div>
 
             <div className="flex justify-end gap-3">
-                <button className="px-4 py-2 bg-white font-medium border border-gray-400 text-red-600 rounded-md">
-                    Delete Order
+                <button
+                    className="px-4 py-2 bg-white font-medium border border-gray-400 text-red-600 rounded-md hover:bg-red-50"
+                    onClick={handleDeleteClick}
+                    disabled={isDeleting}
+                >
+                    {isDeleting ? "Deleting..." : "Delete Order"}
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
                     onClick={handleSaveChanges}
                     disabled={isChangesDisabled}
                 >
                     Save Changes
                 </button>
-                {/* <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${canSendEmail ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
-                    onClick={handleSendEmail}
-                    disabled={!canSendEmail}
-                >
-                    Send to Customer
-                </button> */}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Order"
+                message={`Are you sure you want to delete order ${orderDetails?.referenceNumber || ''}? This action cannot be undone.`}
+            />
         </div>
     );
 }
