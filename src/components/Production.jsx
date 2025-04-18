@@ -14,6 +14,14 @@ function Production({ onSendClick }) {
     const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
 
+    // Store original data for cancel functionality
+    const [originalDetails, setOriginalDetails] = useState({
+        vendorEmail: "",
+        quantity: "",
+        notes: "",
+    });
+    const [originalFiles, setOriginalFiles] = useState([]);
+
     const [details, setDetails] = useState({
         vendorEmail: "",
         quantity: "",
@@ -23,17 +31,27 @@ function Production({ onSendClick }) {
     useEffect(() => {
         if (orderDetails?.production?.length > 0) {
             const firstProduction = orderDetails.production[0];
-            setDetails({
+
+            const initialDetails = {
                 vendorEmail: firstProduction.vendorEmail || "",
                 quantity: firstProduction.quantity || "",
                 notes: firstProduction.notes || "",
-            });
+            };
+
+            setDetails(initialDetails);
+            // Store original details for cancel functionality
+            setOriginalDetails(initialDetails);
+
             const uploadedFiles = firstProduction.files?.map(file => ({
                 file: null,
                 url: file.url,
                 name: file.name,
             })) || [];
+
             setFiles(uploadedFiles);
+            // Store original files for cancel functionality
+            setOriginalFiles([...uploadedFiles]);
+
             // Enable send button if vendorEmail exists and either notes or files are present
             setIsSendEnabled(
                 !!firstProduction.vendorEmail &&
@@ -71,6 +89,22 @@ function Production({ onSendClick }) {
         });
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
+    };
+
+    const handleCancel = () => {
+        // Reset to original values
+        setDetails({ ...originalDetails });
+        setFiles([...originalFiles]);
+        setRemovedFiles([]);
+
+        // Reset buttons state
+        setIsDraftDisabled(true);
+
+        // Restore send button state based on original data
+        setIsSendEnabled(
+            !!originalDetails.vendorEmail &&
+            (originalFiles.length > 0 || !!originalDetails.notes || !!originalDetails.quantity)
+        );
     };
 
     const handleSendEmail = () => {
@@ -198,6 +232,11 @@ function Production({ onSendClick }) {
             useOrderStore.setState({ orderDetails: mergedOrderDetails });
             setFiles(allProductionFiles);
             setIsDraftDisabled(true);
+
+            // Update original values with new saved values
+            setOriginalDetails({ ...details });
+            setOriginalFiles([...allProductionFiles]);
+
             setIsSendEnabled(
                 !!details.vendorEmail &&
                 (allProductionFiles.length > 0 || !!details.notes || !!details.quantity)
@@ -225,8 +264,8 @@ function Production({ onSendClick }) {
     };
 
     return (
-        <div className="py-8 bg-white rounded-lg">
-            <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="py-8 bg-white rounded-lg ">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Vendor Email</label>
                     <input
@@ -274,19 +313,19 @@ function Production({ onSendClick }) {
             </div>
 
             {files.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-4">
+                <div className="mt-2 flex flex-wrap gap-3">
                     {files.map((file, index) => {
                         const { icon, bg } = getFileInfo(file);
                         return (
                             <div
                                 key={index}
-                                className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
+                                className={`relative inline-flex items-center max-w-full px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
                             >
                                 <a
                                     href={file.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2"
+                                    className="flex items-center gap-2 truncate max-w-[200px] sm:max-w-[250px]"
                                 >
                                     {icon}
                                     <span className="truncate">{file.name || "Uploaded File"}</span>
@@ -303,7 +342,7 @@ function Production({ onSendClick }) {
                 </div>
             )}
 
-            <div className="mb-4">
+            <div className="mb-4 mt-4">
                 <label className="text-sm font-medium text-gray-700">Production Notes</label>
                 <textarea
                     placeholder="Enter the production notes"
@@ -315,8 +354,11 @@ function Production({ onSendClick }) {
                 />
             </div>
 
-            <div className="flex justify-end gap-3">
-                <button className="px-4 py-2 border border-gray-400 text-red-600 font-semibold rounded-md">
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+                <button
+                    className="px-4 py-2 border border-gray-400 text-red-600 font-semibold rounded-md hover:bg-red-50"
+                    onClick={handleCancel}
+                >
                     Cancel
                 </button>
                 <button
@@ -337,6 +379,7 @@ function Production({ onSendClick }) {
                 </button>
             </div>
         </div>
+
     );
 }
 

@@ -12,6 +12,13 @@ function Sampling({ onSendClick }) {
     const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
 
+    // Store original data for cancel functionality
+    const [originalDetails, setOriginalDetails] = useState({
+        vendorEmail: "",
+        samplingInstructions: "",
+    });
+    const [originalFiles, setOriginalFiles] = useState([]);
+
     const [details, setDetails] = useState({
         vendorEmail: "",
         samplingInstructions: "",
@@ -21,10 +28,14 @@ function Sampling({ onSendClick }) {
         if (orderDetails?.sampling?.length > 0) {
             const firstSampling = orderDetails.sampling[0];
 
-            setDetails({
+            const initialDetails = {
                 vendorEmail: firstSampling.vendorEmail || "",
                 samplingInstructions: firstSampling.samplingInstructions || "",
-            });
+            };
+
+            setDetails(initialDetails);
+            // Store original details for cancel functionality
+            setOriginalDetails(initialDetails);
 
             const uploadedFiles = firstSampling.files?.map(file => ({
                 file: null,
@@ -32,6 +43,8 @@ function Sampling({ onSendClick }) {
                 name: file.name,
             })) || [];
             setFiles(uploadedFiles);
+            // Store original files for cancel functionality
+            setOriginalFiles([...uploadedFiles]);
 
             // If we have vendor email and either instructions or files, enable send button
             setIsSendEnabled(
@@ -70,6 +83,22 @@ function Sampling({ onSendClick }) {
         setFiles(updatedFiles);
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
+    };
+
+    const handleCancel = () => {
+        // Reset to original values
+        setDetails({ ...originalDetails });
+        setFiles([...originalFiles]);
+        setRemovedFiles([]);
+
+        // Reset buttons state
+        setIsDraftDisabled(true);
+
+        // Restore send button state based on original data
+        setIsSendEnabled(
+            !!originalDetails.vendorEmail &&
+            (!!originalDetails.samplingInstructions || originalFiles.length > 0)
+        );
     };
 
     const handleSaveDraft = async () => {
@@ -134,6 +163,11 @@ function Sampling({ onSendClick }) {
 
             // Update local files state
             setFiles(allFiles);
+
+            // Update original values with new saved values
+            setOriginalDetails({ ...details });
+            setOriginalFiles([...allFiles]);
+
             setIsDraftDisabled(true);
 
             // Enable send button if we have vendor email and either instructions or files
@@ -181,11 +215,13 @@ function Sampling({ onSendClick }) {
     };
 
     return (
+
         <div className="py-8 bg-white rounded-lg">
+            {/* Vendor Email Input */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Vendor Email</label>
                 <input
-                    type="text"
+                    type="email"
                     name="vendorEmail"
                     placeholder="Enter the Vendor Email"
                     value={details.vendorEmail}
@@ -194,6 +230,7 @@ function Sampling({ onSendClick }) {
                 />
             </div>
 
+            {/* File Upload Section */}
             <div className="py-6 bg-white rounded-lg">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
                 <div
@@ -210,18 +247,27 @@ function Sampling({ onSendClick }) {
                     />
                     <div className="text-gray-500">
                         <FaCloudUploadAlt size={30} className="mx-auto" />
-                        <p>Upload a file or drag & drop </p>
+                        <p>Upload a file or drag & drop</p>
                         <p className="text-xs mt-1">PNG, JPG, PDF up to 10MB</p>
                     </div>
                 </div>
 
+                {/* Uploaded File List */}
                 {files.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2">
                         {files.map((file, index) => {
                             const { icon, bg } = getFileInfo(file);
                             return (
-                                <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                <div
+                                    key={index}
+                                    className={`relative flex items-center max-w-full sm:max-w-[45%] md:max-w-[30%] lg:max-w-[22%] gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
+                                >
+                                    <a
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 overflow-hidden"
+                                    >
                                         {icon}
                                         <span className="truncate">{file.name || "Uploaded File"}</span>
                                     </a>
@@ -238,6 +284,7 @@ function Sampling({ onSendClick }) {
                 )}
             </div>
 
+            {/* Sampling Instructions */}
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Sampling Instructions</label>
                 <textarea
@@ -250,8 +297,12 @@ function Sampling({ onSendClick }) {
                 ></textarea>
             </div>
 
-            <div className="flex justify-end gap-3">
-                <button className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md">
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+                <button
+                    className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md hover:bg-red-50"
+                    onClick={handleCancel}
+                >
                     Cancel
                 </button>
                 <button
@@ -270,6 +321,7 @@ function Sampling({ onSendClick }) {
                 </button>
             </div>
         </div>
+
     );
 }
 

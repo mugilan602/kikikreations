@@ -233,7 +233,7 @@ function OrderDetails({ onSendClick }) {
 
     return (
         <div className="bg-white py-8 rounded-lg">
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Customer Email</label>
                     <input
@@ -256,7 +256,7 @@ function OrderDetails({ onSendClick }) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Order Name</label>
                     <input
@@ -306,7 +306,7 @@ function OrderDetails({ onSendClick }) {
                     />
                     <div className="text-gray-500">
                         <FaCloudUploadAlt size={30} className="mx-auto" />
-                        <p>Upload a file or drag & drop </p>
+                        <p>Upload a file or drag & drop</p>
                         <p className="text-xs mt-1">PNG, JPG, PDF up to 10MB</p>
                     </div>
                 </div>
@@ -316,8 +316,16 @@ function OrderDetails({ onSendClick }) {
                         {files.map((file, index) => {
                             const { icon, bg } = getFileInfo(file);
                             return (
-                                <div key={index} className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}>
-                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                <div
+                                    key={index}
+                                    className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium max-w-full`}
+                                >
+                                    <a
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 truncate max-w-[200px]"
+                                    >
                                         {icon}
                                         <span className="truncate">{truncateFileName(file.name || "Uploaded File")}</span>
                                     </a>
@@ -332,18 +340,22 @@ function OrderDetails({ onSendClick }) {
                         })}
                     </div>
                 )}
+
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
                 <button
-                    className="px-4 py-2 bg-white font-medium border border-gray-400 text-red-600 rounded-md hover:bg-red-50"
+                    className="px-4 py-2 bg-white font-medium border border-gray-400 text-red-600 rounded-md hover:bg-red-50 w-full sm:w-auto"
                     onClick={handleDeleteClick}
                     disabled={isDeleting}
                 >
                     {isDeleting ? "Deleting..." : "Delete Order"}
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isChangesDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                    className={`px-4 py-2 font-medium text-white rounded-md w-full sm:w-auto ${isChangesDisabled
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
+                        }`}
                     onClick={handleSaveChanges}
                     disabled={isChangesDisabled}
                 >
@@ -357,9 +369,11 @@ function OrderDetails({ onSendClick }) {
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Order"
-                message={`Are you sure you want to delete order ${orderDetails?.referenceNumber || ''}? This action cannot be undone.`}
+                message={`Are you sure you want to delete order ${orderDetails?.referenceNumber || ""}? This action cannot be undone.`}
             />
         </div>
+
+
     );
 }
 

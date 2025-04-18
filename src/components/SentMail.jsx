@@ -294,8 +294,8 @@ function SentMails({ onSendClick }) {
     };
 
     return (
-        <div className="py-8 bg-white rounded-lg">
-            <div className="flex justify-between items-center mb-4">
+        <div className="py-8 px-4 sm:px-6 bg-white rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
                 <h2 className="text-lg font-semibold">Email History</h2>
                 <button
                     onClick={fetchEmailLogs}
@@ -307,101 +307,108 @@ function SentMails({ onSendClick }) {
                 </button>
             </div>
 
-            <table className="w-full border-collapse">
-                {/* Table Head */}
-                <thead>
-                    <tr className="text-left text-gray-600 text-sm border-b border-t border-gray-400">
-                        <th className="py-2 px-4">Type</th>
-                        <th className="py-2 px-4">Recipient</th>
-                        <th className="py-2 px-4">Subject</th>
-                        <th className="py-2 px-4 text-center">Attachments</th>
-                        <th className="py-2 px-4 text-center">Actions</th>
-                    </tr>
-                </thead>
-
-                {/* Table Body */}
-                <tbody>
-                    {isLoading && mails.length === 0 ? (
-                        <tr>
-                            <td colSpan="5" className="py-8 text-center text-gray-500">Loading email history...</td>
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[600px]">
+                    {/* Table Head */}
+                    <thead>
+                        <tr className="text-left text-gray-600 text-sm border-b border-t border-gray-400">
+                            <th className="py-2 px-4">Type</th>
+                            <th className="py-2 px-4">Recipient</th>
+                            <th className="py-2 px-4">Subject</th>
+                            <th className="py-2 px-4 text-center">Attachments</th>
+                            <th className="py-2 px-4 text-center">Actions</th>
                         </tr>
-                    ) : mails.length === 0 ? (
-                        <tr>
-                            <td colSpan="5" className="py-8 text-center text-gray-500">No emails have been sent yet.</td>
-                        </tr>
-                    ) : (
-                        mails.map((mail, index) => (
-                            <tr key={index} className="text-sm text-gray-700 border-b border-gray-400">
-                                <td className="py-3 px-4">{mail.type}</td>
-                                <td className="py-3 px-4">{mail.recipient}</td>
-                                <td className="py-3 px-4">{mail.subject}</td>
+                    </thead>
 
-                                {/* Attachments Column - Centered */}
-                                <td className="py-3 px-4 text-center">
-                                    <div
-                                        className="flex items-center justify-center space-x-1 cursor-pointer"
-                                        onClick={() => handleOpenAllAttachments(mail.attachments)}
-                                        title={mail.attachments && mail.attachments.length > 0 ? "Click to open all attachments" : "No attachments"}
-                                    >
-                                        <Paperclip
-                                            size={14}
-                                            className={`${mail.attachments && mail.attachments.length > 0 ? "text-blue-600 hover:text-blue-800" : "text-gray-500"}`}
-                                        />
-                                        <span>
-                                            {mail.attachments ? mail.attachments.length : 0} {mail.attachments && mail.attachments.length !== 1 ? "files" : "file"}
-                                        </span>
-                                    </div>
-                                </td>
-
-                                {/* Actions Column - Centered */}
-                                <td className="py-3 px-4 text-center">
-                                    <div className="flex items-center justify-center space-x-3">
-                                        <button
-                                            className="text-gray-500 hover:text-gray-700"
-                                            onClick={() => handleOpenPreview(mail)}
-                                            title="View Email Preview"
-                                        >
-                                            <Eye size={18} />
-                                        </button>
-                                        {/* <button
-                                            className="text-gray-500 hover:text-gray-700"
-                                            onClick={() => handleForwardEmail(mail)}
-                                            title="Forward Email"
-                                        >
-                                            <RiShareForwardFill size={18} />
-                                        </button> */}
-                                        <button
-                                            className="text-gray-500 hover:text-gray-700"
-                                            onClick={() => handleResendEmail(mail)}
-                                            title="Resend Email"
-                                        >
-                                            <RotateCw size={16} />
-                                        </button>
-                                    </div>
+                    {/* Table Body */}
+                    <tbody>
+                        {isLoading && mails.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" className="py-8 text-center text-gray-500">
+                                    Loading email history...
                                 </td>
                             </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
+                        ) : mails.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" className="py-8 text-center text-gray-500">
+                                    No emails have been sent yet.
+                                </td>
+                            </tr>
+                        ) : (
+                            mails.map((mail, index) => (
+                                <tr key={index} className="text-sm text-gray-700 border-b border-gray-300">
+                                    <td className="py-3 px-4">{mail.type}</td>
+                                    <td className="py-3 px-4">{mail.recipient}</td>
+                                    <td className="py-3 px-4">{mail.subject}</td>
+
+                                    {/* Attachments Column */}
+                                    <td className="py-3 px-4 text-center">
+                                        <div
+                                            className="flex items-center justify-center space-x-1 cursor-pointer"
+                                            onClick={() => handleOpenAllAttachments(mail.attachments)}
+                                            title={mail.attachments?.length > 0 ? "Click to open all attachments" : "No attachments"}
+                                        >
+                                            <Paperclip
+                                                size={14}
+                                                className={`${mail.attachments?.length > 0
+                                                        ? "text-blue-600 hover:text-blue-800"
+                                                        : "text-gray-500"
+                                                    }`}
+                                            />
+                                            <span>
+                                                {mail.attachments?.length || 0}{" "}
+                                                {mail.attachments?.length === 1 ? "file" : "files"}
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    {/* Actions Column */}
+                                    <td className="py-3 px-4 text-center">
+                                        <div className="flex items-center justify-center space-x-3">
+                                            <button
+                                                className="text-gray-500 hover:text-gray-700"
+                                                onClick={() => handleOpenPreview(mail)}
+                                                title="View Email Preview"
+                                            >
+                                                <Eye size={18} />
+                                            </button>
+                                            <button
+                                                className="text-gray-500 hover:text-gray-700"
+                                                onClick={() => handleResendEmail(mail)}
+                                                title="Resend Email"
+                                            >
+                                                <RotateCw size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
 
             {/* Email Preview Modal */}
             {selectedMail && (
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-gray-100 rounded-lg max-w-2xl w-full m-4 shadow-xl">
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-gray-100 rounded-lg w-full max-w-2xl mx-4 shadow-xl">
                         <EmailPreview
                             subject={selectedMail.subject || ""}
                             from={selectedMail.from || getSenderEmail(selectedMail.type)}
                             to={selectedMail.recipient || ""}
                             body={selectedMail.body || ""}
-                            attachments={formatAttachmentsForPreview(selectedMail.attachments, selectedMail.attachmentDetails)}
-                            totalSize={(selectedMail.attachments?.length || 0) * 1.2} // Estimate total size
+                            attachments={formatAttachmentsForPreview(
+                                selectedMail.attachments,
+                                selectedMail.attachmentDetails
+                            )}
+                            totalSize={(selectedMail.attachments?.length || 0) * 1.2}
                             onClose={handleClosePreview}
                         />
                     </div>
                 </div>
             )}
         </div>
+
     );
 }
 

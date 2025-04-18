@@ -226,10 +226,11 @@ export default function OrderTable() {
     const isFiltered = searchQuery !== "" || statusFilter !== "all" || labelFilter !== "all";
 
     return (
-        <div className="rounded-xl bg-white shadow-sm mb-4 mx-8">
+
+        <div className="rounded-xl bg-white shadow-sm mb-4 sm:mx-8">
             {/* Search Bar and Filters */}
             <div className="flex rounded-xl flex-col bg-white md:flex-row md:items-center gap-2 px-4 py-6 mb-4">
-                <div className="relative w-6/12">
+                <div className="relative w-full md:w-6/12">
                     <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
                     <input
                         type="text"
@@ -241,7 +242,7 @@ export default function OrderTable() {
                 </div>
 
                 {/* Status Filter */}
-                <div className="relative w-3/12">
+                <div className="relative w-full md:w-3/12">
                     <select
                         className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
                         value={statusFilter}
@@ -259,7 +260,7 @@ export default function OrderTable() {
                 </div>
 
                 {/* Label Filter */}
-                <div className="relative w-3/12">
+                <div className="relative w-full md:w-3/12">
                     <select
                         className="border border-[#E5E7EB] px-3 py-2 rounded w-full"
                         value={labelFilter}
@@ -298,8 +299,8 @@ export default function OrderTable() {
                 </div>
             )}
 
-            {/* Scrollable Table Wrapper for Mobile */}
-            <div className="overflow-x-auto">
+            {/* DESKTOP TABLE - Hidden on Mobile */}
+            <div className="overflow-x-auto hidden md:block">
                 <Accordion.Root
                     className="w-full min-w-[1000px]"
                     type="single"
@@ -320,11 +321,10 @@ export default function OrderTable() {
                     {/* Table Body */}
                     {filteredOrders.length > 0 ? (
                         filteredOrders.map((order, index) => {
-                            // Always prefer the status from orderDetails if it's the currently open order
                             const displayStatus =
                                 orderDetails && orderDetails.id === order.id
                                     ? orderDetails.status
-                                    : order.status || "order-details"; // Default status
+                                    : order.status || "order-details";
 
                             return (
                                 <Accordion.Item
@@ -337,9 +337,7 @@ export default function OrderTable() {
                                             <div className="text-sm text-gray-700 flex items-center hover:bg-gray-50 cursor-pointer">
                                                 <div className="py-4 px-4 w-12 flex items-center justify-center">
                                                     <motion.div
-                                                        animate={{
-                                                            rotate: openItem === order.id ? 90 : 0,
-                                                        }}
+                                                        animate={{ rotate: openItem === order.id ? 90 : 0 }}
                                                         transition={{ duration: 0.2 }}
                                                     >
                                                         <FaChevronRight className="text-gray-500" />
@@ -355,9 +353,7 @@ export default function OrderTable() {
                                                     {order.customerEmail || "No email"}
                                                 </div>
                                                 <div className="py-4 px-4 flex-[2] text-center">
-                                                    <span
-                                                        className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"}`}
-                                                    >
+                                                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"}`}>
                                                         {displayStatus === "order-details" ? "New Order" : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
                                                     </span>
                                                 </div>
@@ -401,6 +397,81 @@ export default function OrderTable() {
                 </Accordion.Root>
             </div>
 
+            {/* MOBILE CARD VIEW - Hidden on Desktop */}
+            <div className="block md:hidden px-4 space-y-4">
+                <Accordion.Root
+                    type="single"
+                    collapsible
+                    onValueChange={handleOrderOpen}
+                    value={openItem}
+                >
+                    {filteredOrders.length > 0 ? (
+                        filteredOrders.map((order) => {
+                            const displayStatus =
+                                orderDetails && orderDetails.id === order.id
+                                    ? orderDetails.status
+                                    : order.status || "order-details";
+
+                            return (
+                                <Accordion.Item key={order.id} value={order.id}>
+                                    <Accordion.Header>
+                                        <Accordion.Trigger asChild>
+                                            <div className="mt-4 sm:mt-0 border border-gray-200 shadow-sm p-4 bg-white w-full text-left">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h3 className="font-semibold text-sm text-gray-900">{order.orderName || "Unnamed Order"}</h3>
+                                                    <span
+                                                        className={`text-xs font-medium px-2 py-1 rounded-full ${statusStyles[displayStatus] || "bg-gray-100 text-gray-800"}`}
+                                                    >
+                                                        {displayStatus === "order-details" ? "New Order" : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-600 mb-1">{order.referenceNumber}</p>
+                                                <p className="text-sm text-gray-600 mb-3">{order.customerEmail}</p>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm text-blue-600 font-medium">View Details</span>
+                                                    <button
+                                                        className="text-red-500"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // prevent accordion toggle
+                                                            handleDeleteClick(e, order);
+                                                        }}
+                                                        aria-label="Delete order"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </Accordion.Trigger>
+                                    </Accordion.Header>
+
+                                    <Accordion.Content>
+                                        <div className="sm:mt-2 border-l border-r border-b rounded-bl-xl rounded-br-xl sm:rounded-xl p-4 bg-gray-50">
+                                            {orderDetails && orderDetails.id === order.id && !isLoadingDetails ? (
+                                                <OrderProgress />
+                                            ) : (
+                                                <div className="py-4 text-center text-gray-500">
+                                                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                                    Loading order details...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Accordion.Content>
+                                </Accordion.Item>
+                            );
+                        })
+                    ) : (
+                        <div className="text-center text-gray-500">
+                            {isFiltered ? (
+                                <>No orders match your filter criteria. <button onClick={resetFilters} className="text-blue-600 hover:underline">Reset filters</button></>
+                            ) : (
+                                <>No orders found. Add your first order to get started.</>
+                            )}
+                        </div>
+                    )}
+                </Accordion.Root>
+            </div>
+
+
             {/* Delete Confirmation Modal */}
             <DeleteConfirmationModal
                 isOpen={isDeleteModalOpen}
@@ -410,5 +481,6 @@ export default function OrderTable() {
                 message={`Are you sure you want to delete order ${orderToDelete?.referenceNumber || ''}? This action cannot be undone.`}
             />
         </div>
+
     );
 }

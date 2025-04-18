@@ -9,6 +9,17 @@ import { withEmailPreview } from "./withEmailPreview";
 function Shipment({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
+
+    // Store original data for cancel functionality
+    const [originalShipmentData, setOriginalShipmentData] = useState({
+        courierEmail: "",
+        referenceNumber: "",
+        orderName: "",
+        labelType: "",
+        orderDetails: "",
+    });
+    const [originalFiles, setOriginalFiles] = useState([]);
+
     const [shipmentData, setShipmentData] = useState({
         courierEmail: "",
         referenceNumber: "",
@@ -23,19 +34,29 @@ function Shipment({ onSendClick }) {
     useEffect(() => {
         if (orderDetails?.shipments?.length > 0) {
             const firstShipment = orderDetails.shipments[0];
-            setShipmentData({
+
+            const initialShipmentData = {
                 courierEmail: firstShipment.courierEmail || "",
                 referenceNumber: firstShipment.referenceNumber || "",
                 orderName: firstShipment.orderName || "",
                 labelType: firstShipment.labelType || "",
                 orderDetails: firstShipment.orderDetails || "",
-            });
+            };
+
+            setShipmentData(initialShipmentData);
+            // Store original data for cancel functionality
+            setOriginalShipmentData(initialShipmentData);
+
             const uploadedFiles = firstShipment.files?.map(file => ({
                 file: null,
                 url: file.url,
                 name: file.name,
             })) || [];
+
             setFiles(uploadedFiles);
+            // Store original files for cancel functionality
+            setOriginalFiles([...uploadedFiles]);
+
             setIsSendEnabled(
                 !!firstShipment.courierEmail &&
                 (uploadedFiles.length > 0 || !!firstShipment.orderDetails || !!firstShipment.referenceNumber)
@@ -71,6 +92,22 @@ function Shipment({ onSendClick }) {
         setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
         setIsDraftDisabled(false);
         setIsSendEnabled(false);
+    };
+
+    const handleCancel = () => {
+        // Reset to original values
+        setShipmentData({ ...originalShipmentData });
+        setFiles([...originalFiles]);
+        setRemovedFiles([]);
+
+        // Reset buttons state
+        setIsDraftDisabled(true);
+
+        // Restore send button state based on original data
+        setIsSendEnabled(
+            !!originalShipmentData.courierEmail &&
+            (originalFiles.length > 0 || !!originalShipmentData.orderDetails || !!originalShipmentData.referenceNumber)
+        );
     };
 
     const handleSendEmail = () => {
@@ -148,6 +185,11 @@ function Shipment({ onSendClick }) {
 
             useOrderStore.setState({ orderDetails: mergedOrderDetails });
             setFiles(allFiles);
+
+            // Update original values with new saved values
+            setOriginalShipmentData({ ...shipmentData });
+            setOriginalFiles([...allFiles]);
+
             setIsDraftDisabled(true);
             setIsSendEnabled(
                 !!shipmentData.courierEmail &&
@@ -173,7 +215,7 @@ function Shipment({ onSendClick }) {
 
     return (
         <div className="py-8 bg-white rounded-lg">
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Courier Email</label>
                     <input
@@ -196,7 +238,7 @@ function Shipment({ onSendClick }) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700">Order Name</label>
                     <input
@@ -253,19 +295,19 @@ function Shipment({ onSendClick }) {
                 </div>
 
                 {files.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-4">
+                    <div className="mt-3 flex flex-wrap gap-3">
                         {files.map((file, index) => {
                             const { icon, bg } = getFileInfo(file);
                             return (
                                 <div
                                     key={index}
-                                    className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium`}
+                                    className={`relative flex items-center gap-2 px-3 py-1 rounded-lg shadow-sm ${bg} text-sm font-medium max-w-full`}
                                 >
                                     <a
                                         href={file.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-2"
+                                        className="flex items-center gap-2 truncate max-w-[200px] sm:max-w-[250px]"
                                     >
                                         {icon}
                                         <span className="truncate">{file.name || "Uploaded File"}</span>
@@ -283,21 +325,22 @@ function Shipment({ onSendClick }) {
                 )}
             </div>
 
-            <div className="flex justify-end gap-3">
-                <button className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md">
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+                <button
+                    className="px-4 py-2 border border-gray-400 text-red-600 font-medium rounded-md hover:bg-red-50"
+                    onClick={handleCancel}
+                >
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"
-                        }`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
                     onClick={handleSaveDraft}
                     disabled={isDraftDisabled}
                 >
                     Save Draft
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"
-                        }`}
+                    className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}
                     onClick={handleSendEmail}
                     disabled={!isSendEnabled}
                 >
@@ -305,6 +348,7 @@ function Shipment({ onSendClick }) {
                 </button>
             </div>
         </div>
+
     );
 }
 

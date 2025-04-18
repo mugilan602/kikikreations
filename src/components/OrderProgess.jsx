@@ -68,7 +68,7 @@ export default function OrderProgress() {
     return (
         <div className="w-full max-w-6xl mx-auto">
             {/* Stepper Progress Bar */}
-            <div className="relative flex justify-between items-center mt-6 mb-8 px-6">
+            <div className="relative hidden sm:flex justify-between items-center mt-6 mb-8 px-6">
                 <div className="absolute top-5 left-0 w-full h-1 bg-gray-300"></div>
                 <div
                     className="absolute top-5 left-0 h-1 bg-blue-600 transition-all duration-300"
@@ -110,7 +110,7 @@ export default function OrderProgress() {
                 onValueChange={(value) => setActiveTab(value)}
                 className="w-full"
             >
-                <Tabs.List className="flex border-b border-[#E5E7EB]">
+                <Tabs.List className="flex border-b overflow-auto border-[#E5E7EB]">
                     {["Order Details", "Sampling", "Production", "Shipment", "Sent Mails"].map(
                         (tab) => {
                             const tabValue = tab.toLowerCase().replace(" ", "-");
