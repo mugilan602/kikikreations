@@ -101,14 +101,14 @@ Thanks,`,
                                         {getFileIcon(file.type)}
                                         <span className="text-sm font-medium">{file.name}</span>
                                     </div>
-                                    <span className="text-xs text-gray-500">{file.size} MB</span>
+                                    {/* <span className="text-xs text-gray-500">{file.size} MB</span> */}
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                <p className="text-xs text-gray-500">Total size: {totalSize.toFixed(1)} MB</p>
+                {/* <p className="text-xs text-gray-500">Total size: {totalSize.toFixed(1)} MB</p> */}
 
                 {/* Display error if present */}
                 {sendError && (

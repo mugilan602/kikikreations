@@ -26,16 +26,16 @@ function Navbar() {
     return (
         <>
             {/* Desktop & Tablet Navbar */}
-            <nav className="bg-white shadow-md flex justify-between items-center px-8 py-4">
+            <nav className="bg-white shadow-md flex justify-between items-center px-8 py-2">
                 {/* Left Section - Branding */}
-                <div className="flex items-center gap-10">
-                    <div className="flex items-center py-2 space-x-2">
+                <div className="flex items-end gap-10">
+                    <div className="flex items-center  space-x-2">
                         <img src="/images/logo.png" alt="Kiki Kreations Ine" className="h-12" />
                     </div>
 
                     {/* Desktop Navigation (Hidden on Mobile) */}
                     <div className="hidden md:flex flex-end space-x-6 text-base font-medium">
-                        <Link to="/" className={`hover:text-blue-600 border-b-2 pb-3 ${isActive("/")}`}>Orders</Link>
+                        <Link to="/orderpage" className={`hover:text-blue-600 border-b-2 pb-3 ${isActive("/orderpage")}`}>Orders</Link>
                         <Link to="/expenses" className={`hover:text-blue-600 border-b-2 pb-3 ${isActive("/expenses")}`}>Expenses</Link>
                     </div>
                 </div>
@@ -83,7 +83,7 @@ function Navbar() {
 
                         {/* Mobile Navigation Links */}
                         <div className="flex flex-col space-y-4 mt-10 w-full font-medium text-lg">
-                            <Link to="/orders" className={`block py-2 ${isActive("/orders")}`} onClick={() => setIsOpen(false)}>Order Tracking</Link>
+                            <Link to="/orderpage" className={`block py-2 ${isActive("/orders")}`} onClick={() => setIsOpen(false)}>Order Tracking</Link>
                             <Link to="/expenses" className={`block py-2 ${isActive("/expenses")}`} onClick={() => setIsOpen(false)}>Expenses</Link>
                         </div>
 

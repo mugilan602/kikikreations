@@ -78,22 +78,22 @@ export const withEmailPreview = (WrappedComponent, stageName) => {
             switch (stageName) {
                 case "orderDetails":
                     subject = `Order Confirmation: ${orderDetails?.referenceNumber || "New Order"}`;
-                    from = "orders@company.com";
+                    from = "kikikreations@gmail.com";
                     body = `Hi,\n\nThank you for your order ${orderDetails?.referenceNumber || ""}.\n\nOrder Details:\n- Order Name: ${data.orderName || orderDetails?.orderName || ""}\n- Reference Number: ${data.referenceNumber || orderDetails?.referenceNumber || ""}\n- Label Type: ${data.labelType || orderDetails?.labelType || ""}\n\n${data.orderDetails || data.notes || ""}\n\nPlease let us know if you have any questions.\n\nThank you,\nThe Team`;
                     break;
                 case "sampling":
                     subject = `Sampling Request: ${orderDetails?.referenceNumber || ""}`;
-                    from = "sampling@company.com";
+                    from = "kikikreations@gmail.com";
                     body = `Hi,\n\nWe would like to request samples for the following order:\n\nOrder Details:\n- Reference Number: ${orderDetails?.referenceNumber || ""}\n- Order Name: ${orderDetails?.orderName || ""}\n\nSampling Instructions:\n${data.samplingInstructions || data.instructions || data.notes || ""}\n\nPlease review the attached files and let us know if you have any questions.\n\nThank you,\nThe Team`;
                     break;
                 case "production":
                     subject = `Production Request: ${orderDetails?.referenceNumber || ""}`;
-                    from = "production@company.com";
+                    from = "kikikreations@gmail.com";
                     body = `Hi,\n\nWe would like to start production for the following order:\n\nOrder Details:\n- Reference Number: ${orderDetails?.referenceNumber || ""}\n- Order Name: ${orderDetails?.orderName || ""}\n- Quantity: ${data.quantity || ""}\n\nProduction Notes:\n${data.notes || ""}\n\nPlease review the attached files and let us know if you have any questions.\n\nThank you,\nThe Team`;
                     break;
                 case "shipment":
                     subject = `Shipment Request: ${orderDetails?.referenceNumber || ""}`;
-                    from = "shipping@company.com";
+                    from = "kikikreations@gmail.com";
                     body = `Hi,\n\nPlease find the shipping details for the following order:\n\nOrder Details:\n- Reference Number: ${data.referenceNumber || orderDetails?.referenceNumber || ""}\n- Order Name: ${data.orderName || orderDetails?.orderName || ""}\n- Label Type: ${data.labelType || orderDetails?.labelType || ""}\n\nAdditional Information:\n${data.orderDetails || data.details || data.notes || ""}\n\nPlease review the attached files and proceed with the shipment.\n\nThank you,\nThe Team`;
                     break;
                 case "sentMail":

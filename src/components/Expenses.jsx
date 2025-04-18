@@ -528,7 +528,7 @@ export default function ExpensesTable() {
                     </div>
                 </div>
 
-                <div className="pt-6 bg-white rounded-b-lg shadow-md p-4">
+                <div className="pt-6 bg-white rounded-b-lg shadow-md p-4 overflow-auto">
                     <table className="w-full border-collapse">
                         <thead>
                             <tr className="text-left text-gray-600 border-b">
