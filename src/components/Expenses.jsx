@@ -425,7 +425,7 @@ export default function ExpensesTable() {
 
             {/* Upload Receipts + Add Manually */}
             <div className="p-6 bg-gray-100">
-                <div className="p-6 rounded-lg bg-white">
+                <div className="sm:p-6 rounded-lg bg-white">
                     <div className="flex space-x-4">
                         {/* Upload Box */}
                         <div
@@ -479,9 +479,9 @@ export default function ExpensesTable() {
             </div>
 
             {/* Search + Table */}
-            <div className="p-6 bg-gray-100">
-                <div className="bg-white p-4 rounded-t-lg flex justify-between items-center shadow">
-                    <div className="flex items-center border rounded px-3 py-2 bg-white w-1/3">
+            <div className="p-6 bg-gray-100 overflow-auto">
+                <div className="bg-white p-4 rounded-t-lg sm:flex justify-between items-center shadow">
+                    <div className="flex items-center border mb-2 sm:mb-0 rounded px-3 py-2 bg-white sm:w-1/3">
                         <Search size={18} className="text-gray-500 mr-2" />
                         <input
                             type="text"
@@ -610,7 +610,7 @@ export default function ExpensesTable() {
                         </tbody>
                     </table>
                     {/* Pagination */}
-                    <div className="flex items-center justify-between py-4 mt-3">
+                    <div className="flex items-center justify-between py-4 mt-3 overflow-auto">
                         <div className="text-sm text-gray-500">
                             Showing {startDisplay} to {endDisplay} of {totalResults} results
                         </div>

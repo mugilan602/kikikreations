@@ -74,7 +74,7 @@ function Navbar() {
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ duration: 0.3 }}
-                        className="fixed top-0 right-0 w-3/2 sm:w-1/2 h-full bg-white shadow-lg z-50 flex flex-col items-start pt-8 px-6"
+                        className="fixed top-0 right-0 w-5/6 h-full bg-white shadow-lg z-50 flex flex-col items-start pt-8 px-6"
                     >
                         {/* Close Button */}
                         <button className="absolute top-5 right-5 text-[#4A3B2D]" onClick={() => setIsOpen(false)}>
