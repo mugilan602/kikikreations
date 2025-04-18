@@ -35,6 +35,10 @@ export default function OrderTable() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [labelFilter, setLabelFilter] = useState("all");
 
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(10); // Number of orders per page
+
     // Delete confirmation state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
@@ -110,6 +114,11 @@ export default function OrderTable() {
     useEffect(() => {
         refreshFilters();
     }, [orders.length]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, statusFilter, labelFilter]);
 
     const handleOrderOpen = async (orderId) => {
         // When closing (orderId is null or empty), just clean up
@@ -187,6 +196,12 @@ export default function OrderTable() {
             // Close the modal
             setIsDeleteModalOpen(false);
             setOrderToDelete(null);
+
+            // Adjust pagination if necessary
+            const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+            if (currentPage > totalPages && currentPage > 1) {
+                setCurrentPage(currentPage - 1);
+            }
         } catch (error) {
             console.error("Error deleting order:", error);
             showToast(`Failed to delete order: ${error.message}`, "error");
@@ -215,18 +230,30 @@ export default function OrderTable() {
         });
     }, [orders, searchQuery, statusFilter, labelFilter]);
 
+    // Pagination logic
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    const paginatedOrders = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredOrders.slice(startIndex, endIndex);
+    }, [filteredOrders, currentPage, itemsPerPage]);
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
     // Reset all filters
     const resetFilters = () => {
         setSearchQuery("");
         setStatusFilter("all");
         setLabelFilter("all");
+        setCurrentPage(1);
     };
 
     // Check if any filters are active
     const isFiltered = searchQuery !== "" || statusFilter !== "all" || labelFilter !== "all";
 
     return (
-
         <div className="rounded-xl bg-white shadow-sm mb-4 sm:mx-8">
             {/* Search Bar and Filters */}
             <div className="flex rounded-xl flex-col bg-white md:flex-row md:items-center gap-2 px-4 py-6 mb-4">
@@ -319,8 +346,8 @@ export default function OrderTable() {
                     </div>
 
                     {/* Table Body */}
-                    {filteredOrders.length > 0 ? (
-                        filteredOrders.map((order, index) => {
+                    {paginatedOrders.length > 0 ? (
+                        paginatedOrders.map((order, index) => {
                             const displayStatus =
                                 orderDetails && orderDetails.id === order.id
                                     ? orderDetails.status
@@ -330,7 +357,7 @@ export default function OrderTable() {
                                 <Accordion.Item
                                     key={order.id}
                                     value={order.id}
-                                    className={index === filteredOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}
+                                    className={index === paginatedOrders.length - 1 ? "" : "border-b border-[#E5E7EB]"}
                                 >
                                     <Accordion.Header>
                                         <Accordion.Trigger asChild>
@@ -405,8 +432,8 @@ export default function OrderTable() {
                     onValueChange={handleOrderOpen}
                     value={openItem}
                 >
-                    {filteredOrders.length > 0 ? (
-                        filteredOrders.map((order) => {
+                    {paginatedOrders.length > 0 ? (
+                        paginatedOrders.map((order) => {
                             const displayStatus =
                                 orderDetails && orderDetails.id === order.id
                                     ? orderDetails.status
@@ -445,7 +472,7 @@ export default function OrderTable() {
                                     </Accordion.Header>
 
                                     <Accordion.Content>
-                                        <div className="sm:mt-2 border-l border-r border-b rounded-bl-xl rounded-br-xl sm:rounded-xl p-4 bg-gray-50">
+                                        <div className="sm:mt-2 border-l border-r border-b rounded-bl-xl rounded-br-xl sm:rounded-xl p-4 sm:bg-gray-50">
                                             {orderDetails && orderDetails.id === order.id && !isLoadingDetails ? (
                                                 <OrderProgress />
                                             ) : (
@@ -471,6 +498,37 @@ export default function OrderTable() {
                 </Accordion.Root>
             </div>
 
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center px-4 py-4 text-sm text-gray-600">
+                <span>
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredOrders.length)} of {filteredOrders.length} results
+                </span>
+                <div className="flex items-center space-x-2">
+                    <button
+                        className={`px-2 py-1 rounded border ${currentPage === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                    >
+                        &lt;
+                    </button>
+                    {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                        <button
+                            key={page}
+                            className={`px-3 py-1 rounded ${currentPage === page ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                            onClick={() => handlePageChange(page)}
+                        >
+                            {page}
+                        </button>
+                    ))}
+                    <button
+                        className={`px-2 py-1 rounded border ${currentPage === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                    >
+                        &gt;
+                    </button>
+                </div>
+            </div>
 
             {/* Delete Confirmation Modal */}
             <DeleteConfirmationModal
@@ -481,6 +539,5 @@ export default function OrderTable() {
                 message={`Are you sure you want to delete order ${orderToDelete?.referenceNumber || ''}? This action cannot be undone.`}
             />
         </div>
-
     );
 }

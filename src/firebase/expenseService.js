@@ -109,10 +109,11 @@ export const analyzeReceiptWithGemini = async (receiptText) => {
                                     "vendor": "Walmart",
                                     "category": "Food & Dining",
                                     "description": "Milk, Bread, Eggs",
-                                    "amount": "$25.50",
+                                    "amount": "25.50",
                                     "payment": "Credit Card",
-                                    "hst": "$3.32"
-                                }`
+                                    "hst": "3.32"
+                                }
+                                Strictly adhere to the example output dont include any symbol or currency metrics for amount`
                             }
                         ]
                     }

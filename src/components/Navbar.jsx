@@ -1,17 +1,23 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom"; // Import useLocation
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Pencil, Menu, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { logoutUser } from "../firebase/auth";
+import { auth } from "../firebase/firebaseConfig"; // Assuming the Firebase auth instance is in this file
 
 function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation(); // Get current route
 
-    // Logout function
-    const handleLogout = () => {
-        localStorage.removeItem("isAdmin");
-        navigate("/");
+    // Logout function using Firebase
+    const handleLogout = async () => {
+        try {
+            await logoutUser(auth); // Firebase signOut method
+            navigate("/"); // Redirect to login page
+        } catch (error) {
+            console.error("Error logging out:", error.message);
+        }
     };
 
     // Function to determine if a link is active
@@ -20,9 +26,9 @@ function Navbar() {
     return (
         <>
             {/* Desktop & Tablet Navbar */}
-            <nav className="bg-white shadow-md flex justify-between px-8">
+            <nav className="bg-white shadow-md flex justify-between items-center px-8 py-4">
                 {/* Left Section - Branding */}
-                <div className="flex items-end justify-between md:justify-start gap-10">
+                <div className="flex items-center gap-10">
                     <div className="flex items-center py-2 space-x-2">
                         <img src="/images/logo.png" alt="Kiki Kreations Ine" className="h-12" />
                     </div>
@@ -30,16 +36,29 @@ function Navbar() {
                     {/* Desktop Navigation (Hidden on Mobile) */}
                     <div className="hidden md:flex flex-end space-x-6 text-base font-medium">
                         <Link to="/" className={`hover:text-blue-600 border-b-2 pb-3 ${isActive("/")}`}>Orders</Link>
-                        <Link to="/expenses" className={`hover:text-blue-600 border-b-2 pb-3  ${isActive("/expenses")}`}>Expenses</Link>
+                        <Link to="/expenses" className={`hover:text-blue-600 border-b-2 pb-3 ${isActive("/expenses")}`}>Expenses</Link>
                     </div>
+                </div>
+
+                {/* Profile Pic and Logout Button (Right-aligned) */}
+                <div className="flex items-center gap-4">
+                    {/* Desktop Profile Pic */}
+                    <div className="hidden md:flex items-center">
+                        <img src="/images/profile.png" alt="Kiki Kreations Ine" className="h-10 w-10 rounded-full" />
+                    </div>
+
+                    {/* Desktop Logout Button */}
+                    <button
+                        className="hidden md:block bg-black text-white py-2 px-4 rounded-lg hover:bg-gray-700"
+                        onClick={handleLogout}
+                    >
+                        Logout
+                    </button>
 
                     {/* Mobile Menu Button */}
                     <button className="md:hidden text-[#4A3B2D]" onClick={() => setIsOpen(true)}>
                         <Menu size={28} />
                     </button>
-                </div>
-                <div className="flex items-center py-2 space-x-2">
-                    <img src="/images/profile.png" alt="Kiki Kreations Ine" className="h-12 rounded-full" />
                 </div>
             </nav>
 
@@ -55,7 +74,7 @@ function Navbar() {
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ duration: 0.3 }}
-                        className="fixed top-0 right-0 w-3/4 sm:w-1/2 h-full bg-white shadow-lg z-50 flex flex-col items-start pt-8 px-6"
+                        className="fixed top-0 right-0 w-3/2 sm:w-1/2 h-full bg-white shadow-lg z-50 flex flex-col items-start pt-8 px-6"
                     >
                         {/* Close Button */}
                         <button className="absolute top-5 right-5 text-[#4A3B2D]" onClick={() => setIsOpen(false)}>
@@ -68,7 +87,7 @@ function Navbar() {
                             <Link to="/expenses" className={`block py-2 ${isActive("/expenses")}`} onClick={() => setIsOpen(false)}>Expenses</Link>
                         </div>
 
-                        {/* Logout Button */}
+                        {/* Mobile Logout Button */}
                         <button className="mt-8 w-full bg-black text-white py-3 rounded" onClick={handleLogout}>
                             Logout
                         </button>

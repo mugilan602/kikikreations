@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import OrderTable from '../components/OrderTable';
 import { Plus } from 'lucide-react';
-import { Dialog, DialogTrigger, DialogContent,DialogTitle } from "../components/ui/dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogTitle } from "../components/ui/dialog";
 import AddNewOrder from '../components/AddNewOrder';
 
 function OrderPage() {
     const [open, setOpen] = useState(false);
 
     return (
-        <div className="bg-gray-50">
+        <div className="bg-gray-50 min-h-screen">
             <div className="flex items-center justify-between mx-8 py-4">
                 <h1 className="font-semibold text-2xl">My Orders</h1>
                 <Dialog open={open} onOpenChange={setOpen}>

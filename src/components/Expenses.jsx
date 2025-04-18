@@ -10,7 +10,9 @@ import {
     Loader,
     AlertTriangle,
     CheckCircle,
-    FileType
+    FileType,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import {
@@ -37,6 +39,10 @@ export default function ExpensesTable() {
     const [statusMessage, setStatusMessage] = useState(null);
     const fileInputRef = useRef(null);
     const dropAreaRef = useRef(null);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const expensesPerPage = 10;
 
     // Load expenses on mount
     useEffect(() => {
@@ -130,6 +136,11 @@ export default function ExpensesTable() {
         };
     }, []);
 
+    // Reset to first page when search or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, dateFilter]);
+
     const filteredExpenses = expenses.filter((expense) => {
         // Filter by search term (vendor name)
         const matchesSearch = expense.vendor?.toLowerCase().includes(search.toLowerCase());
@@ -144,6 +155,27 @@ export default function ExpensesTable() {
         return matchesSearch && matchesDate;
     });
 
+    // Calculate pagination data
+    const totalResults = filteredExpenses.length;
+    const totalPages = Math.ceil(totalResults / expensesPerPage);
+
+    // Get current page of expenses
+    const indexOfLastExpense = currentPage * expensesPerPage;
+    const indexOfFirstExpense = indexOfLastExpense - expensesPerPage;
+    const currentExpenses = filteredExpenses.slice(indexOfFirstExpense, indexOfLastExpense);
+
+    // Calculate display text for pagination
+    const startDisplay = totalResults === 0 ? 0 : indexOfFirstExpense + 1;
+    const endDisplay = Math.min(indexOfLastExpense, totalResults);
+
+    // Handle page changes
+    const goToPage = (pageNumber) => {
+        if (pageNumber >= 1 && pageNumber <= totalPages) {
+            setCurrentPage(pageNumber);
+            setSelected([]);
+        }
+    };
+
     const handleCheckboxChange = (id) => {
         setSelected((prev) =>
             prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
@@ -151,10 +183,10 @@ export default function ExpensesTable() {
     };
 
     const handleSelectAll = () => {
-        if (selected.length === filteredExpenses.length) {
+        if (selected.length === currentExpenses.length) {
             setSelected([]);
         } else {
-            setSelected(filteredExpenses.map((e) => e.id));
+            setSelected(currentExpenses.map((e) => e.id));
         }
     };
 
@@ -504,8 +536,8 @@ export default function ExpensesTable() {
                                     <input
                                         type="checkbox"
                                         checked={
-                                            selected.length === filteredExpenses.length &&
-                                            filteredExpenses.length > 0
+                                            selected.length === currentExpenses.length &&
+                                            currentExpenses.length > 0
                                         }
                                         onChange={handleSelectAll}
                                     />
@@ -522,7 +554,7 @@ export default function ExpensesTable() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredExpenses.map((expense, index) => (
+                            {currentExpenses.map((expense, index) => (
                                 <tr className="border-b text-gray-700" key={expense.id}>
                                     <td className="py-3 px-3">
                                         <input
@@ -531,7 +563,7 @@ export default function ExpensesTable() {
                                             onChange={() => handleCheckboxChange(expense.id)}
                                         />
                                     </td>
-                                    <td className="py-3 px-3">{index + 1}</td>
+                                    <td className="py-3 px-3">{indexOfFirstExpense + index + 1}</td>
                                     <td className="py-3 px-3">{expense.date}</td>
                                     <td className="py-3 px-3 font-semibold">{expense.vendor}</td>
                                     <td className="py-3 px-3">{expense.description}</td>
@@ -566,14 +598,131 @@ export default function ExpensesTable() {
                                             />
                                         </div>
                                     </td>
-
                                 </tr>
                             ))}
+                            {currentExpenses.length === 0 && (
+                                <tr>
+                                    <td colSpan="10" className="text-center py-4">
+                                        {search || dateFilter ? "No matching expenses found." : "No expenses available."}
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
-                    <div className="text-gray-500 text-sm p-3">
-                        Showing {filteredExpenses.length} of {expenses.length} results
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between py-4 mt-3">
+                        <div className="text-sm text-gray-500">
+                            Showing {startDisplay} to {endDisplay} of {totalResults} results
+                        </div>
+                        <div className="flex justify-end">
+                            <nav className="relative z-0 inline-flex rounded-md shadow-sm" aria-label="Pagination">
+                                {/* Previous button */}
+                                <button
+                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <span className="sr-only">Previous</span>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+
+                                {/* Page 1 button - always show */}
+                                <button
+                                    onClick={() => goToPage(1)}
+                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === 1
+                                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    1
+                                </button>
+
+                                {/* Show dots if there are many pages and we're not at the beginning */}
+                                {totalPages > 3 && currentPage > 2 && (
+                                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                        ...
+                                    </span>
+                                )}
+
+                                {/* Middle pages */}
+                                {totalPages > 1 &&
+                                    Array.from(
+                                        { length: Math.min(totalPages, 3) - (totalPages > 2 ? 2 : 1) },
+                                        (_, i) => {
+                                            let pageNum;
+
+                                            if (totalPages <= 3) {
+                                                // For 2-3 total pages, show page 2 (page 1 is always shown separately)
+                                                pageNum = i + 2;
+                                            } else if (currentPage <= 2) {
+                                                // Near the start, show page 2
+                                                pageNum = 2;
+                                            } else if (currentPage >= totalPages - 1) {
+                                                // Near the end, show the second-to-last page
+                                                pageNum = totalPages - 1;
+                                            } else {
+                                                // Otherwise show the current page
+                                                pageNum = currentPage;
+                                            }
+
+                                            if (pageNum !== 1 && pageNum !== totalPages) {
+                                                return (
+                                                    <button
+                                                        key={pageNum}
+                                                        onClick={() => goToPage(pageNum)}
+                                                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum
+                                                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        {pageNum}
+                                                    </button>
+                                                );
+                                            }
+                                            return null;
+                                        }
+                                    ).filter(Boolean)
+                                }
+
+                                {/* Show dots if there are many pages and we're not at the end */}
+                                {totalPages > 3 && currentPage < totalPages - 1 && (
+                                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                        ...
+                                    </span>
+                                )}
+
+                                {/* Last page button - always show if more than 1 page */}
+                                {totalPages > 1 && (
+                                    <button
+                                        onClick={() => goToPage(totalPages)}
+                                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === totalPages
+                                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {totalPages}
+                                    </button>
+                                )}
+
+                                {/* Next button */}
+                                <button
+                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages || totalPages === 0
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <span className="sr-only">Next</span>
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </nav>
+                        </div>
                     </div>
+
                 </div>
             </div>
         </>
