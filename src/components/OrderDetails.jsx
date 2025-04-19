@@ -292,24 +292,25 @@ function OrderDetails({ onSendClick }) {
 
             <div className="mb-4">
                 <label className="text-sm font-medium text-gray-700">Attachments</label>
-                <div
-                    className="mt-4 border-2 border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:border-gray-500"
-                    onClick={() => document.getElementById("fileUpload").click()}
+                <label
+                    htmlFor="fileUpload"
+                    className="mt-4 block border-2 border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:border-gray-500 relative"
                 >
                     <input
                         type="file"
                         id="fileUpload"
                         multiple
-                        className="hidden"
-                        onChange={handleFileUpload}
                         accept=".png,.jpg,.jpeg,.pdf"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <div className="text-gray-500">
+                    <div className="text-gray-500 pointer-events-none">
                         <FaCloudUploadAlt size={30} className="mx-auto" />
-                        <p>Upload a file or drag & drop</p>
+                        <p>Upload a file or tap here</p>
                         <p className="text-xs mt-1">PNG, JPG, PDF up to 10MB</p>
                     </div>
-                </div>
+                </label>
+
 
                 {files.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2">
