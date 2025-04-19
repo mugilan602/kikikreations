@@ -22,7 +22,7 @@ import Tesseract from "tesseract.js";
 import axios from "axios";
 
 // Replace with your Gemini API Key
-const GEMINI_API_KEY = "AIzaSyClaMGJ-2rvYsa98r_jhrhvTIO5K4Th1x4";
+const GEMINI_API_KEY = "AIzaSyCieZcVJTr2YJc7aMDEJ1PGjwt0hmWujzI";
 
 // ✅ Upload receipt files to storage
 export const uploadReceipt = async (file) => {
@@ -83,7 +83,7 @@ export const analyzeReceiptWithGemini = async (receiptText) => {
         console.log("🔍 Analyzing receipt with Gemini API...");
 
         const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
             {
                 contents: [
                     {

@@ -12,7 +12,8 @@ import {
     CheckCircle,
     FileType,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    MoreVertical
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import {
@@ -39,7 +40,12 @@ export default function ExpensesTable() {
     const [statusMessage, setStatusMessage] = useState(null);
     const fileInputRef = useRef(null);
     const dropAreaRef = useRef(null);
+    const [showDateFilter, setShowDateFilter] = useState(false);
+    const [openActionId, setOpenActionId] = useState(null);
 
+    const toggleActionMenu = (id) => {
+        setOpenActionId(openActionId === id ? null : id);
+    };
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const expensesPerPage = 10;
@@ -479,7 +485,7 @@ export default function ExpensesTable() {
             </div>
 
             {/* Search + Table */}
-            <div className="p-6 bg-gray-100 overflow-auto">
+            <div className="hidden md:block p-6 bg-gray-100 overflow-auto">
                 <div className="bg-white p-4 rounded-t-lg sm:flex justify-between items-center shadow">
                     <div className="flex items-center border mb-2 sm:mb-0 rounded px-3 py-2 bg-white sm:w-1/3">
                         <Search size={18} className="text-gray-500 mr-2" />
@@ -725,6 +731,128 @@ export default function ExpensesTable() {
 
                 </div>
             </div>
+           
+            {/* Mobile View */}
+            <div className="block md:hidden bg-white p-4 rounded-lg shadow">
+                {/* Search & Filters */}
+                <div className="flex items-center border rounded-lg px-3 py-2 mb-4">
+                    <Search size={18} className="text-gray-500 mr-2" />
+                    <input
+                        type="text"
+                        placeholder="Search expenses..."
+                        className="outline-none bg-white w-full text-sm"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {/* Toggle Date Filter */}
+                    <button onClick={() => setShowDateFilter(!showDateFilter)}>
+                        <Filter className="text-gray-500 ml-2" />
+                    </button>
+                    <FileText className="text-gray-500 ml-2" onClick={handleExportCSV} />
+                </div>
+
+                {/* Date Picker */}
+                {showDateFilter && (
+                    <div className="flex items-center mb-4 border px-3 py-2 rounded-lg">
+                        <input
+                            type="date"
+                            className="bg-transparent border-none outline-none w-full text-sm"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                        />
+                        {dateFilter && (
+                            <X
+                                size={16}
+                                className="ml-2 cursor-pointer text-gray-500 hover:text-gray-700"
+                                onClick={() => setDateFilter("")}
+                            />
+                        )}
+                    </div>
+                )}
+
+                {/* Expense Cards */}
+                <div className="space-y-3">
+                    {currentExpenses.length === 0 ? (
+                        <div className="text-center text-gray-500 text-sm">
+                            {search || dateFilter ? "No matching expenses found." : "No expenses available."}
+                        </div>
+                    ) : (
+                        currentExpenses.map((expense, index) => (
+                            <div
+                                key={expense.id}
+                                className="relative flex justify-between items-start border rounded-lg p-3 shadow-sm"
+                            >
+                                <div>
+                                    <div className="font-semibold text-sm text-gray-900">
+                                        {expense.vendor}
+                                    </div>
+                                    <div className="text-xs text-gray-500">{expense.description}</div>
+                                    <div className="text-xs text-gray-400 mt-1">{expense.date}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-sm font-semibold text-gray-800">
+                                        ${expense.amount}
+                                    </div>
+                                    <div className="flex items-center justify-end mt-2 space-x-2">
+                                        {expense.receiptUrl ? (
+                                            <a
+                                                href={expense.receiptUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <FileText size={16} className="text-gray-600" />
+                                            </a>
+                                        ) : (
+                                            <FileText size={16} className="text-gray-300" />
+                                        )}
+                                        <div className="relative">
+                                            <button onClick={() => toggleActionMenu(expense.id)}>
+                                                <MoreVertical size={16} className="text-gray-500" />
+                                            </button>
+                                            {openActionId === expense.id && (
+                                                <div className="absolute right-0 mt-2 w-24 bg-white border rounded shadow z-50">
+                                                    <button
+                                                        className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-50"
+                                                        onClick={() => {
+                                                            handleSingleDelete(expense.id);
+                                                            setOpenActionId(null);
+                                                        }}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-center mt-6 space-x-4">
+                    <button
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`p-2 border rounded ${currentPage === 1 ? 'text-gray-300' : 'text-gray-600'}`}
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                    <div className="text-sm text-gray-600">
+                        Page {currentPage} of {totalPages}
+                    </div>
+                    <button
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className={`p-2 border rounded ${currentPage === totalPages ? 'text-gray-300' : 'text-gray-600'}`}
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            </div>
+
+
         </>
     );
 }
