@@ -44,8 +44,8 @@ export const sendEmail = functions.https.onRequest((req, res) => {
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
-                    user: functions.config().email.user,
-                    pass: functions.config().email.password
+                    user: "kikikreation@gmail.com",
+                    pass: "ujxr qwuh drhz opsx"
                 }
             });
 
@@ -133,8 +133,8 @@ export const processEmailQueue = functions.firestore.document('emailQueue/{email
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
-                    user: functions.config().email.user,
-                    pass: functions.config().email.password
+                    user: "kikikreation@gmail.com",
+                    pass: "ujxr qwuh drhz opsx"
                 }
             });
 
