@@ -5,10 +5,13 @@ import useOrderStore from "../store/orderStore";
 import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addShipmentToOrder } from "../firebase/shipment.js";
 import { withEmailPreview } from "./withEmailPreview";
+import { useToast } from "./ToastContext"; // Import the toast context
 
 function Shipment({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
     const [removedFiles, setRemovedFiles] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const { showToast } = useToast(); // Use the toast context
 
     // Store original data for cancel functionality
     const [originalShipmentData, setOriginalShipmentData] = useState({
@@ -140,6 +143,7 @@ function Shipment({ onSendClick }) {
         setIsSendEnabled(false);
 
         try {
+            setLoading(true)
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
             const existingFiles = files.filter(f => f.file === null);
             let uploadedFiles = [];
@@ -196,12 +200,14 @@ function Shipment({ onSendClick }) {
                 (allFiles.length > 0 || !!shipmentData.orderDetails || !!shipmentData.referenceNumber)
             );
 
-            alert("Draft saved successfully!");
+            showToast("Changes saved successfully", "success");
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsDraftDisabled(false);
             setIsSendEnabled(false);
             console.error("Error saving draft:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -221,6 +227,7 @@ function Shipment({ onSendClick }) {
                     <input
                         type="email"
                         name="courierEmail"
+                        placeholder="Enter the Courier Email"
                         value={shipmentData.courierEmail}
                         onChange={handleChange}
                         className="w-full mt-1 p-2 border border-gray-300 rounded-md"
@@ -334,11 +341,15 @@ function Shipment({ onSendClick }) {
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
+                    className={`px-4 py-2 font-medium flex items-center justify-center text-white rounded-md ${isDraftDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600"}`}
                     onClick={handleSaveDraft}
                     disabled={isDraftDisabled}
                 >
-                    Save Draft
+                    {loading &&
+                        (
+                            <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                    {loading ? "Saving..." : "Save Draft"}
                 </button>
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"}`}

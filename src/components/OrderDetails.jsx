@@ -12,7 +12,7 @@ function OrderDetails({ onSendClick }) {
     const orders = useOrderStore((state) => state.orders); // Get orders array
     const setOrders = useOrderStore((state) => state.setOrders); // Get setter for orders
     const { showToast } = useToast(); // Use the toast context
-
+    const [changes, setChanges] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
     const [files, setFiles] = useState([]);
     const [details, setDetails] = useState({
@@ -101,6 +101,7 @@ function OrderDetails({ onSendClick }) {
         }
 
         try {
+            setChanges(true);
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
             const existingFiles = files.filter(f => f.file === null);
             let uploadedFiles = [];
@@ -152,6 +153,8 @@ function OrderDetails({ onSendClick }) {
         } catch (error) {
             console.error("Error during save:", error);
             showToast(`Failed to save changes: ${error.message}`, "error");
+        } finally {
+            setChanges(false);
         }
     };
 
@@ -353,20 +356,25 @@ function OrderDetails({ onSendClick }) {
                     {isDeleting ? "Deleting..." : "Delete Order"}
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md w-full sm:w-auto ${isChangesDisabled
+                    className={`px-4 py-2 font-medium text-white rounded-md flex items-center justify-center gap-2 w-full sm:w-auto ${(isChangesDisabled || changes)
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-blue-600 hover:bg-blue-700"
                         }`}
                     onClick={handleSaveChanges}
-                    disabled={isChangesDisabled}
+                    disabled={isChangesDisabled || changes}
                 >
-                    Save Changes
+                    {changes && (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )
+                    }
+                    {changes ? "Saving..." : "Save Changes"}
                 </button>
             </div>
 
             {/* Delete Confirmation Modal */}
             <DeleteConfirmationModal
                 isOpen={isDeleteModalOpen}
+                isDeleting={isDeleting}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Order"

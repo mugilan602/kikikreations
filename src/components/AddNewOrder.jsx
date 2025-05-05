@@ -12,6 +12,7 @@ export default function AddNewOrder({ setOpen }) {
     const [referenceNumber, setReferenceNumber] = useState("");
     const [files, setFiles] = useState([]);
     const { showToast } = useToast(); // Use the toast context
+    const [loading, setLoading] = useState(false);
 
     // Get orders setter from the store to update UI
     const setOrders = useOrderStore((state) => state.setOrders);
@@ -35,7 +36,7 @@ export default function AddNewOrder({ setOpen }) {
                 showToast("Reference number and files are required!", "error");
                 return;
             }
-
+            setLoading(true);
             console.log("Uploading files...");
 
             // Upload files to Firebase Storage and get download URLs
@@ -76,13 +77,14 @@ export default function AddNewOrder({ setOpen }) {
         } catch (error) {
             console.error("Error in handleSubmit:", error);
             showToast(`Failed to create order: ${error.message}`, "error");
+        } finally {
+            setLoading(false);
+            setOpen(false);
         }
-
-        setOpen(false);
     };
 
     return (
-        <div className="w-full bg-white  max-h-[80vh] overflow-y-auto">
+        <div className="w-full bg-white  max-h-[80vh] overflow-y-auto relative">
             <h2 className="text-lg font-semibold mb-4">Add New Order</h2>
 
             {/* Customer Email */}
@@ -196,6 +198,14 @@ export default function AddNewOrder({ setOpen }) {
                     Add Order
                 </button>
             </div>
+            {loading && (
+                <div className="fixed inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin"></div>
+                </div>
+            )}
+
+
         </div>
+
     );
 }

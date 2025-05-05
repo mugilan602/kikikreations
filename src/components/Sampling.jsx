@@ -13,6 +13,7 @@ import {
 } from "../firebase/order.js";
 import { addSamplingToOrder } from "../firebase/sampling.js";
 import { withEmailPreview } from "./withEmailPreview";
+import { useToast } from "./ToastContext"; // Import the toast context
 
 function Sampling({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
@@ -20,7 +21,8 @@ function Sampling({ onSendClick }) {
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
     const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
-
+    const { showToast } = useToast();
+    const [loading, setLoading] = useState(false)
     const [details, setDetails] = useState({
         vendorEmail: "",
         samplingInstructions: "",
@@ -123,6 +125,7 @@ function Sampling({ onSendClick }) {
         setIsSendEnabled(false);
 
         try {
+            setLoading(true);
             const newFiles = files.filter((f) => f.file !== null).map((f) => f.file);
             const existingFiles = files.filter((f) => f.file === null);
             let uploadedFiles = [];
@@ -190,11 +193,15 @@ function Sampling({ onSendClick }) {
                 (!!details.samplingInstructions || allFiles.length > 0)
             );
 
-            alert("Draft saved successfully!");
+            // alert("Draft saved successfully!");
+            showToast("Changes saved successfully", "success");
+
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsDraftDisabled(false);
             console.error("Error saving draft:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -323,14 +330,18 @@ function Sampling({ onSendClick }) {
                     Cancel
                 </button>
                 <button
-                    className={`px-4 py-2 font-medium text-white rounded-md ${isDraftDisabled
+                    className={`px-4 py-2 font-medium text-white flex items-center justify-center gap-2 rounded-md ${isDraftDisabled
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-blue-600"
                         }`}
                     onClick={handleSaveDraft}
                     disabled={isDraftDisabled}
                 >
-                    Save Draft
+                    {loading &&
+                        (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                    {loading ? "Saving...":"Save Draft"}
                 </button>
                 <button
                     className={`px-4 py-2 font-medium text-white rounded-md ${isSendEnabled

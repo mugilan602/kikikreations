@@ -3,9 +3,12 @@ import EmailPreview from "./EmailPreview";
 import { logEmail } from "../firebase/emailLog.js"; // Import the email logging function
 import useOrderStore from "../store/orderStore";
 import { updateOrder } from "../firebase/order.js"; // Import the updateOrder function
+import { useToast } from "./ToastContext"; // Import the toast context
 
 export const withEmailPreview = (WrappedComponent, stageName) => {
     return function WithEmailPreviewComponent(props) {
+        const { showToast } = useToast(); // Use the toast context
+
         const orderDetails = useOrderStore((state) => state.orderDetails);
         const setOrderDetails = useOrderStore((state) => state.setOrderDetails); // Add setter from Zustand store
         const [showEmailPreview, setShowEmailPreview] = useState(false);
@@ -273,8 +276,7 @@ export const withEmailPreview = (WrappedComponent, stageName) => {
                 });
 
                 handleCloseEmailPreview();
-                alert(`Email has been sent successfully to ${emailData.to}`);
-
+                showToast(`Email has been sent successfully to ${emailData.to}`, "success");
                 if (props.onEmailSent) {
                     props.onEmailSent();
                 }

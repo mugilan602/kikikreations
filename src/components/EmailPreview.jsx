@@ -125,6 +125,9 @@ Thanks,`,
                             disabled={isSending}
                             className={`px-4 py-2 rounded-md flex items-center ${isSending ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
                         >
+                            {isSending && (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2 animate-spin"></div>
+                            )}
                             {isSending ? 'Sending...' : 'Send'}
                             {!isSending && <Send className="w-4 h-4 ml-2" />}
                         </button>

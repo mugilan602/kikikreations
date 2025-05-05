@@ -5,14 +5,16 @@ import { uploadFiles, deleteFilesFromStorage } from "../firebase/order.js";
 import { addProductionToOrder } from "../firebase/production.js";
 import { addShipmentToOrder } from "../firebase/shipment.js";
 import { withEmailPreview } from "./withEmailPreview";
+import { useToast } from "./ToastContext"; // Import the toast context
 
 function Production({ onSendClick }) {
     const orderDetails = useOrderStore((state) => state.orderDetails);
-
+    const [loading, setLoading] = useState(false);
     const [files, setFiles] = useState([]);
     const [isDraftDisabled, setIsDraftDisabled] = useState(true);
     const [isSendEnabled, setIsSendEnabled] = useState(false);
     const [removedFiles, setRemovedFiles] = useState([]);
+    const { showToast } = useToast(); // Use the toast context
 
     // Store original data for cancel functionality
     const [originalDetails, setOriginalDetails] = useState({
@@ -135,6 +137,7 @@ function Production({ onSendClick }) {
         setIsSendEnabled(false);
 
         try {
+            setLoading(true);
             const newFiles = files.filter(f => f.file !== null).map(f => f.file);
             const existingFiles = files.filter(f => f.file === null);
             let uploadedProductionFiles = [];
@@ -242,11 +245,16 @@ function Production({ onSendClick }) {
                 (allProductionFiles.length > 0 || !!details.notes || !!details.quantity)
             );
 
-            alert("Draft saved successfully! Production files added to shipments.");
+            // alert("Draft saved successfully! Production files added to shipments.");
+
+            showToast("Changes saved successfully", "success");
+
         } catch (error) {
             alert("Failed to save draft. Please try again.");
             setIsDraftDisabled(false);
             console.error("Error saving draft:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -365,10 +373,13 @@ function Production({ onSendClick }) {
                 <button
                     onClick={handleSaveDraft}
                     disabled={isDraftDisabled}
-                    className={`px-4 py-2 font-medium rounded-md ${isDraftDisabled ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"
+                    className={`px-4 py-2 font-medium flex items-center justify-center rounded-md ${isDraftDisabled ? "bg-gray-400 text-gray-200 cursor-not-allowed" : "bg-blue-600 text-white"
                         }`}
                 >
-                    Save Draft
+                    {loading &&
+                        (<div className="w-4 h-4 border-2 mr-2 border-white border-t-transparent rounded-full animate-spin"></div>)
+                    }
+                    {loading ? "Saving..." : "Save Draft"}
                 </button>
                 <button
                     onClick={handleSendEmail}

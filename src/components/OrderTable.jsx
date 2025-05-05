@@ -38,6 +38,7 @@ export default function OrderTable() {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10); // Number of orders per page
+    const [loading, setLoading] = useState(false);
 
     // Delete confirmation state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -81,6 +82,7 @@ export default function OrderTable() {
     useEffect(() => {
         const fetchOrders = async () => {
             try {
+                setLoading(true);
                 const data = await getOrders();
                 // Sort orders by createdAt date (newest first)
                 const sortedOrders = data.sort((a, b) => {
@@ -94,6 +96,8 @@ export default function OrderTable() {
             } catch (error) {
                 console.error("Error fetching orders: ", error);
                 showToast(`Error fetching orders: ${error.message}`, "error");
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -327,7 +331,8 @@ export default function OrderTable() {
             )}
 
             {/* DESKTOP TABLE - Hidden on Mobile */}
-            <div className="overflow-x-auto hidden md:block">
+            <div className="overflow-x-auto hidden md:block relative">
+
                 <Accordion.Root
                     className="w-full min-w-[1000px]"
                     type="single"
@@ -422,6 +427,11 @@ export default function OrderTable() {
                         </div>
                     )}
                 </Accordion.Root>
+                {loading && (
+                    <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50">
+                        <div className="border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12 animate-spin"></div>
+                    </div>
+                )}
             </div>
 
             {/* MOBILE CARD VIEW - Hidden on Desktop */}
@@ -533,6 +543,7 @@ export default function OrderTable() {
             {/* Delete Confirmation Modal */}
             <DeleteConfirmationModal
                 isOpen={isDeleteModalOpen}
+                isDeleting={isDeleting}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Order"
